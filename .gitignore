@@ -11,3 +11,6 @@ data/raw/*.csv
 data/db/
 data/exports/
 reports/
+
+# Build artifacts
+*.egg-info/

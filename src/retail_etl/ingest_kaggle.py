@@ -6,8 +6,6 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from kaggle.api.kaggle_api_extended import KaggleApi
-
 from .logging_config import get_logger
 from .paths import get_paths
 
@@ -79,6 +77,9 @@ def download_dataset_file(
     if dest_path is None:
         dest_path = paths.raw_dir / filename
     dest_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Import Kaggle only when we actually need to download, to keep dashboard import lightweight.
+    from kaggle.api.kaggle_api_extended import KaggleApi
 
     api = KaggleApi()
     api.authenticate()

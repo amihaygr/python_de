@@ -82,7 +82,6 @@ def main() -> None:
         initial_sidebar_state="expanded",
     )
     settings = Settings.load()
-    paths = get_paths()
     db_path = settings.db_path
 
     st.title("Retail sales — ETL dashboard")

@@ -7,6 +7,7 @@ import sqlite3
 import pandas as pd
 
 from .paths import get_paths
+from .sql_guard import assert_export_table
 
 
 def _ensure_parent(path: Path) -> None:
@@ -14,8 +15,9 @@ def _ensure_parent(path: Path) -> None:
 
 
 def _read_table(db_path: Path, table: str) -> pd.DataFrame:
+    safe = assert_export_table(table)
     with sqlite3.connect(db_path) as conn:
-        return pd.read_sql_query(f"SELECT * FROM {table}", conn)
+        return pd.read_sql_query(f"SELECT * FROM {safe}", conn)
 
 
 def generate_charts(db_path: Path | None = None) -> None:

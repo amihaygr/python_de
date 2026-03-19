@@ -7,6 +7,7 @@ import pandas as pd
 import sqlite3
 
 from .paths import get_paths
+from .sql_guard import assert_export_table
 
 
 def _ensure_parent(path: Path) -> None:
@@ -14,7 +15,8 @@ def _ensure_parent(path: Path) -> None:
 
 
 def _read_table(conn: sqlite3.Connection, table: str) -> pd.DataFrame:
-    return pd.read_sql_query(f"SELECT * FROM {table}", conn)
+    safe = assert_export_table(table)
+    return pd.read_sql_query(f"SELECT * FROM {safe}", conn)
 
 
 def export_tables(

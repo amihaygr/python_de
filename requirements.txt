@@ -3,3 +3,5 @@ plotly
 kaleido
 pyarrow
 openpyxl
+streamlit
+kaggle

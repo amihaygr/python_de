@@ -24,6 +24,18 @@ Python ETL project for the Naya College Data Engineering course, based on the On
 pip install -r requirements.txt
 ```
 
+### Kaggle API setup (optional)
+
+If you want the project to **download data automatically** from Kaggle, configure Kaggle credentials
+in one of these ways:
+
+- **Environment variables**:
+  - `KAGGLE_USERNAME`
+  - `KAGGLE_KEY`
+- **Kaggle JSON file**:
+  - `C:\\Users\\<you>\\.kaggle\\kaggle.json` (Windows)
+  - `~/.kaggle/kaggle.json` (macOS/Linux)
+
 ### CLI usage
 
 - **Full pipeline** (Extract → Transform → Load → Export → Plot):
@@ -50,6 +62,70 @@ python -m retail_etl.cli export
 
 ```bash
 python -m retail_etl.cli plot
+```
+
+### API ingestion + monitoring
+
+- **Download a specific dataset file from Kaggle**:
+
+```bash
+python -m retail_etl.cli ingest --dataset <owner/dataset> --filename <file.csv>
+```
+
+- **Check if the raw file changed and refresh ETL automatically**:
+
+```bash
+python -m retail_etl.cli monitor --dataset <owner/dataset> --filename <file.csv> --allow-incremental
+```
+
+- **Watch mode (poll every 5 minutes)**:
+
+```bash
+python -m retail_etl.cli watch --dataset <owner/dataset> --filename <file.csv> --interval-seconds 300
+```
+
+Monitoring writes status and alerts into SQLite meta tables:
+
+- `meta_source_state` (fingerprint of raw file)
+- `meta_schema_state` (observed CSV columns / dtypes)
+- `meta_pipeline_runs` (history of ETL runs)
+- `meta_alerts` (active alerts, e.g. schema change)
+
+Optional: refresh from Kaggle before comparing fingerprints:
+
+```bash
+python -m retail_etl.cli monitor --dataset <owner/dataset> --filename <file.csv> --download --allow-incremental
+```
+
+Watch with periodic pull from Kaggle:
+
+```bash
+python -m retail_etl.cli watch --dataset <owner/dataset> --filename <file.csv> --interval-seconds 300 --pull
+```
+
+### Production-style features
+
+- **Structured logging** to stderr (`RETAIL_ETL_LOG_LEVEL`, or `python -m retail_etl.cli --log-level DEBUG run-all` — global flags must come **before** the subcommand).
+- **Configuration via env** (see `.env.example`): `RETAIL_ETL_DB_PATH`, `RETAIL_ETL_RAW_CSV`, `RETAIL_KAGGLE_*`.
+- **SQL allowlists** for dashboard/exporter/plotting (no dynamic table names from untrusted input).
+- **SQLite transactions** with `BEGIN IMMEDIATE` on full and incremental loads; rollback on failure.
+- **Streamlit**: Plotly charts, optional `secrets.toml` defaults (copy from `.streamlit/secrets.toml.example`), Kaggle pull toggle on “Check now”.
+- **Docker**: `docker build -t retail-etl .` then run with a volume for `data/`.
+- **Tests**: `pip install -r requirements-dev.txt` then `pytest`.
+
+### Streamlit dashboard
+
+Run the dashboard:
+
+```bash
+streamlit run app.py
+```
+
+In the **Intro** tab, you can see monitoring status and trigger a manual **Check now**.
+
+```bash
+docker build -t retail-etl .
+docker run --rm -p 8501:8501 -v retail_data:/app/data retail-etl
 ```
 
 ### Analysis highlights

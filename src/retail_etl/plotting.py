@@ -1,4 +1,4 @@
-"""יצירת קבצי גרף Plotly (HTML/PNG) מתוך טבלאות mart."""
+"""Generate Plotly chart files (HTML/PNG) from mart tables."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ def _read_table(db_path: Path, table: str) -> pd.DataFrame:
 
 
 def generate_charts(db_path: Path | None = None) -> None:
-    """שומר גרפים עיקריים לתיקיית הדוחות."""
+    """Write standard charts to the reports charts directory."""
     paths = get_paths()
     if db_path is None:
         db_path = paths.db_dir / "retail.db"
@@ -35,7 +35,7 @@ def generate_charts(db_path: Path | None = None) -> None:
         monthly,
         x="year_month",
         y="revenue",
-        title="הכנסה חודשית לאורך זמן",
+        title="Monthly revenue over time",
     )
     _save_figure(fig_monthly, charts_dir / "monthly_revenue")
 
@@ -44,9 +44,9 @@ def generate_charts(db_path: Path | None = None) -> None:
         products,
         x="Description",
         y="revenue",
-        title="10 המוצרים המובילים לפי הכנסה",
+        title="Top 10 products by revenue",
     )
-    fig_products.update_layout(xaxis_title="מוצר", xaxis_tickangle=-45)
+    fig_products.update_layout(xaxis_title="Product", xaxis_tickangle=-45)
     _save_figure(fig_products, charts_dir / "top_products")
 
     customers = _read_table(db_path, "mart_customer_summary").head(10)
@@ -54,7 +54,7 @@ def generate_charts(db_path: Path | None = None) -> None:
         customers,
         x="CustomerID",
         y="revenue",
-        title="10 הלקוחות המובילים לפי הכנסה",
+        title="Top 10 customers by revenue",
     )
     _save_figure(fig_customers, charts_dir / "top_customers")
 
@@ -63,7 +63,7 @@ def generate_charts(db_path: Path | None = None) -> None:
         countries,
         x="Country",
         y="revenue",
-        title="10 המדינות המובילות לפי הכנסה",
+        title="Top 10 countries by revenue",
     )
     fig_countries.update_layout(xaxis_tickangle=-45)
     _save_figure(fig_countries, charts_dir / "top_countries")

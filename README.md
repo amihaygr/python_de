@@ -26,15 +26,17 @@ pip install -r requirements.txt
 
 ### Kaggle API setup (optional)
 
-If you want the project to **download data automatically** from Kaggle, configure Kaggle credentials
-in one of these ways:
+If you want the project to **download data automatically** from Kaggle, configure credentials in one of these ways:
 
 - **Environment variables**:
   - `KAGGLE_USERNAME`
-  - `KAGGLE_KEY`
+  - `KAGGLE_KEY` (create at [Kaggle → Settings → API](https://www.kaggle.com/settings))
 - **Kaggle JSON file**:
   - `C:\\Users\\<you>\\.kaggle\\kaggle.json` (Windows)
   - `~/.kaggle/kaggle.json` (macOS/Linux)
+- **Project `.env`**: copy `.env.example` to `.env`, set `KAGGLE_USERNAME` / `KAGGLE_KEY` there. The app and CLI load `.env` on startup via `python-dotenv` (see `retail_etl.settings`).
+- **Docker**: the container does not include your home directory. Either pass `-e KAGGLE_USERNAME=... -e KAGGLE_KEY=...`, or mount your token folder read-only, for example  
+  `-v %USERPROFILE%\.kaggle:/root/.kaggle:ro` (Windows host) or `-v ~/.kaggle:/root/.kaggle:ro` (Linux/macOS).
 
 ### CLI usage
 

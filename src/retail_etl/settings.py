@@ -9,6 +9,17 @@ from pathlib import Path
 from .paths import ProjectPaths, get_paths
 
 
+def _load_dotenv_if_available() -> None:
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return
+    load_dotenv()
+
+
+_load_dotenv_if_available()
+
+
 @dataclass(frozen=True)
 class Settings:
     """ערכי קונפיגורציה לתהליך."""

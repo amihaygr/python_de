@@ -41,8 +41,13 @@ def _ensure_kaggle_auth_hint() -> None:
     kaggle_json = Path.home() / ".kaggle" / "kaggle.json"
     if kaggle_json.exists():
         return
+    home = Path.home()
     raise RuntimeError(
-        "לא נמצאו הרשאות קגל. הגדר KAGGLE_USERNAME ו־KAGGLE_KEY או צור ~/.kaggle/kaggle.json."
+        "Kaggle credentials not found. Set KAGGLE_USERNAME and KAGGLE_KEY (from "
+        "https://www.kaggle.com/settings → API → Create New Token), "
+        f"or place kaggle.json at {home / '.kaggle' / 'kaggle.json'}. "
+        "You can store the two variables in a project `.env` file (see `.env.example`); "
+        "Streamlit and the CLI load it on startup."
     )
 
 

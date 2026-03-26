@@ -14,6 +14,7 @@ import streamlit as st
 
 from retail_etl.analytics import RetailAnalytics
 from retail_etl.db_security import assert_read_table
+from retail_etl.local_time import format_utc_iso_as_israel, localize_alert_rows
 from retail_etl.meta import connect as meta_connect, get_last_success, get_source_state, list_active_alerts
 from retail_etl.monitor import check_for_update
 from retail_etl.presentation import APP_STYLE, project_root_from_app, render_architecture_presentation
@@ -223,7 +224,11 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
             alerts = list_active_alerts(conn)
 
         m1, m2, m3 = st.columns(3)
-        m1.metric("Last successful refresh", last_success["finished_at"] if last_success else "—")
+        m1.metric(
+            "Last successful refresh",
+            format_utc_iso_as_israel(last_success["finished_at"]) if last_success else "—",
+            help="Stored in UTC; shown in Asia/Jerusalem (IST/IDT).",
+        )
         m2.metric("Last run mode", last_success["mode"] if last_success else "—")
         m3.metric("Active alerts", str(len(alerts)))
 
@@ -234,12 +239,15 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
             sha = source_state.get("sha256") or "—"
             st.caption(
                 f"Source fingerprint: `{sha[:16]}…` · {source_state.get('size_bytes')} bytes · "
-                f"updated {source_state.get('updated_at')}"
+                f"last updated (Israel): **{format_utc_iso_as_israel(source_state.get('updated_at'))}**"
             )
 
         if alerts:
             st.error("Active data-quality or pipeline alerts")
-            st.dataframe(alerts, use_container_width=True)
+            st.dataframe(
+                pd.DataFrame(localize_alert_rows(alerts)),
+                use_container_width=True,
+            )
 
         if st.button("Run refresh check", type="primary"):
             if not dataset.strip():

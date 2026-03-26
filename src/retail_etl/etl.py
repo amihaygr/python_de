@@ -71,6 +71,12 @@ def clean_sales(df: pd.DataFrame, cfg: Optional[CleanConfig] = None) -> pd.DataF
     # מחרוזת תאריך אחידה לעמודת TEXT ב־SQLite (תואם ל־strftime בשאילתות)
     df["InvoiceDate"] = df["InvoiceDate"].dt.strftime("%Y-%m-%d %H:%M:%S")
 
+    # Online Retail exports may repeat the same line key; staging unique index requires one row per key.
+    df = df.drop_duplicates(
+        subset=["InvoiceNo", "StockCode", "CustomerID", "InvoiceDate"],
+        keep="first",
+    )
+
     return df
 
 
@@ -78,9 +84,26 @@ def _ensure_parent(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
 
+def _dedupe_staging_table(conn: sqlite3.Connection) -> None:
+    """Remove duplicate natural keys so CREATE UNIQUE INDEX can succeed."""
+    n = conn.execute("SELECT COUNT(*) FROM stg_sales_clean").fetchone()[0]
+    if n == 0:
+        return
+    conn.execute(
+        """
+        DELETE FROM stg_sales_clean
+        WHERE rowid NOT IN (
+            SELECT MIN(rowid) FROM stg_sales_clean
+            GROUP BY InvoiceNo, StockCode, CustomerID, InvoiceDate
+        )
+        """
+    )
+
+
 def _init_staging(conn: sqlite3.Connection, *, use_unique_index: bool = False) -> None:
     conn.executescript(load_sql("etl_init_staging.sql"))
     if use_unique_index:
+        _dedupe_staging_table(conn)
         conn.executescript(load_sql("etl_create_unique_index.sql"))
 
 

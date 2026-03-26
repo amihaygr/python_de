@@ -144,7 +144,10 @@ def main() -> None:
     download_from_kaggle = st.sidebar.checkbox(
         "Download from Kaggle before fingerprint check",
         value=False,
-        help="Requires Kaggle credentials. Overwrites the local file under data/raw.",
+        help=(
+            "Requires Kaggle credentials. If the raw CSV is missing, a download is attempted automatically; "
+            "check this box to overwrite an existing file under data/raw."
+        ),
     )
 
     with st.spinner("Loading mart tables…"):

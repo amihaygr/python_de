@@ -83,19 +83,32 @@ def check_for_update(
     if db_path is None:
         db_path = paths.db_dir / "retail.db"
 
-    if download_first:
+    missing = not csv_path.exists()
+    # First run: no local raw file yet — pull from Kaggle if credentials + slug are configured.
+    need_download = download_first or missing
+    if need_download:
         from .ingest_kaggle import download_dataset_file
 
-        logger.info("Downloading latest file from Kaggle: %s / %s", dataset, filename)
+        logger.info(
+            "Downloading from Kaggle: %s / %s (missing=%s, user_requested=%s)",
+            dataset,
+            filename,
+            missing,
+            download_first,
+        )
         download_dataset_file(
             dataset=dataset,
             filename=filename,
             dest_path=csv_path,
-            force=True,
+            force=download_first,
         )
 
     if not csv_path.exists():
-        raise FileNotFoundError(f"CSV not found at {csv_path}. Run ingest first.")
+        raise FileNotFoundError(
+            f"CSV not found at {csv_path}. "
+            "Configure Kaggle credentials, set dataset slug + filename in the sidebar, "
+            "or run: python -m retail_etl.cli ingest --dataset <owner/dataset> --filename <file.csv>"
+        )
 
     fp = fingerprint_file(csv_path)
 

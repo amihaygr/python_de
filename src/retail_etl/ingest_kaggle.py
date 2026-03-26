@@ -1,3 +1,5 @@
+"""הורדת קבצים מקגל וחישוב טביעת אצבע לקובץ."""
+
 from __future__ import annotations
 
 import hashlib
@@ -6,7 +8,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from .logging_config import get_logger
+from .utils import get_logger
 from .paths import get_paths
 
 logger = get_logger(__name__)
@@ -33,24 +35,20 @@ def _sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
 
 
 def _ensure_kaggle_auth_hint() -> None:
-    # KaggleApi reads credentials from:
-    # - environment variables: KAGGLE_USERNAME / KAGGLE_KEY
-    # - or: ~/.kaggle/kaggle.json
+    # הרשאות: משתני סביבה או ~/.kaggle/kaggle.json
     if os.getenv("KAGGLE_USERNAME") and os.getenv("KAGGLE_KEY"):
         return
     kaggle_json = Path.home() / ".kaggle" / "kaggle.json"
     if kaggle_json.exists():
         return
     raise RuntimeError(
-        "Kaggle credentials not found. Set KAGGLE_USERNAME/KAGGLE_KEY or create ~/.kaggle/kaggle.json."
+        "לא נמצאו הרשאות קגל. הגדר KAGGLE_USERNAME ו־KAGGLE_KEY או צור ~/.kaggle/kaggle.json."
     )
 
 
 def _validate_dataset_slug(dataset: str) -> None:
     if not _KAGGLE_SLUG_RE.match(dataset.strip()):
-        raise ValueError(
-            f"Invalid Kaggle dataset slug {dataset!r}. Expected format: owner/dataset-name"
-        )
+        raise ValueError(f"מזהה מערך לא תקין {dataset!r}. פורמט נדרש: owner/dataset-name")
 
 
 def download_dataset_file(
@@ -59,18 +57,10 @@ def download_dataset_file(
     dest_path: Path | None = None,
     force: bool = False,
 ) -> FileFingerprint:
-    """
-    Download a specific file from a Kaggle dataset.
-
-    Args:
-        dataset: Kaggle dataset identifier, e.g. 'carrie1/ecommerce-data'
-        filename: File name inside the dataset, e.g. 'data.csv'
-        dest_path: Destination file path. Defaults to data/raw/<filename>
-        force: Re-download even if file exists.
-    """
+    """מוריד קובץ ספציפי מתוך מערך בקגל; מחזיר טביעת אצבע."""
     _validate_dataset_slug(dataset)
     if not filename or filename.strip() != filename or ".." in filename or "/" in filename or "\\" in filename:
-        raise ValueError(f"Unsafe or invalid filename: {filename!r}")
+        raise ValueError(f"שם קובץ לא תקין או לא בטוח: {filename!r}")
 
     _ensure_kaggle_auth_hint()
     paths = get_paths()

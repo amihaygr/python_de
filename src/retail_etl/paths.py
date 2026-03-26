@@ -1,3 +1,5 @@
+"""נתיבים סטנדרטיים בפרויקט (data, db, raw, דוחות)."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -34,7 +36,7 @@ class ProjectPaths:
 
 
 def get_project_root() -> Path:
-    # This file is src/retail_etl/paths.py → project root is 3 parents up.
+    # קובץ זה ב־src/retail_etl/paths.py → שורש הפרויקט הוא parents[2]
     return Path(__file__).resolve().parents[2]
 
 

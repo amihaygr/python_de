@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from retail_etl.sql_guard import SqlGuardError, assert_export_table, assert_read_table
+from retail_etl.db_security import SqlGuardError, assert_export_table, assert_read_table
 
 
 def test_allowed_read_table() -> None:

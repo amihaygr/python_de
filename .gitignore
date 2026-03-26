@@ -17,3 +17,6 @@ reports/
 
 # Streamlit secrets (never commit)
 .streamlit/secrets.toml
+
+# Editor (local)
+.vscode/

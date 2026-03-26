@@ -1,3 +1,5 @@
+"""טעינת CSV, ניקוי, כתיבה ל־SQLite ויצירת טבלאות mart."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -7,21 +9,25 @@ from typing import Optional
 import pandas as pd
 import sqlite3
 
-from .logging_config import get_logger
 from .paths import get_paths
+from .sql_loader import load_sql
 
-logger = get_logger(__name__)
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
 class CleanConfig:
+    """פרמטרים לניקוי שורות."""
+
     min_quantity: int = 1
     min_unit_price: float = 0.0
     drop_missing_customer: bool = True
 
 
 def load_raw_csv(path: Optional[Path] = None) -> pd.DataFrame:
-    """Load the raw retail_sales CSV into a DataFrame."""
+    """קורא את קובץ ה־CSV הגולמי ל־DataFrame."""
     if path is None:
         path = get_paths().raw_dir / "retail_sales.csv"
     df = pd.read_csv(path)
@@ -29,7 +35,7 @@ def load_raw_csv(path: Optional[Path] = None) -> pd.DataFrame:
 
 
 def clean_sales(df: pd.DataFrame, cfg: Optional[CleanConfig] = None) -> pd.DataFrame:
-    """Apply basic cleaning to the raw sales data."""
+    """מנקה נתוני מכירות: טיפוסים, תאריכים, סינון שורות, שדה line_total."""
     cfg = cfg or CleanConfig()
 
     df = df.copy()
@@ -53,7 +59,7 @@ def clean_sales(df: pd.DataFrame, cfg: Optional[CleanConfig] = None) -> pd.DataF
 
     df["line_total"] = df["Quantity"] * df["UnitPrice"]
 
-    # Normalize to ISO-like strings for SQLite TEXT column (consistent strftime in SQL).
+    # מחרוזת תאריך אחידה לעמודת TEXT ב־SQLite (תואם ל־strftime בשאילתות)
     df["InvoiceDate"] = df["InvoiceDate"].dt.strftime("%Y-%m-%d %H:%M:%S")
 
     return df
@@ -64,88 +70,32 @@ def _ensure_parent(path: Path) -> None:
 
 
 def _init_staging(conn: sqlite3.Connection, *, use_unique_index: bool = False) -> None:
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS stg_sales_clean (
-            InvoiceNo TEXT,
-            StockCode TEXT,
-            Description TEXT,
-            Quantity INTEGER,
-            InvoiceDate TEXT,
-            UnitPrice REAL,
-            CustomerID INTEGER,
-            Country TEXT,
-            line_total REAL
-        )
-        """
-    )
+    conn.executescript(load_sql("etl_init_staging.sql"))
     if use_unique_index:
-        conn.execute(
-            """
-            CREATE UNIQUE INDEX IF NOT EXISTS ux_sales_key
-            ON stg_sales_clean (InvoiceNo, StockCode, CustomerID, InvoiceDate)
-            """
-        )
+        conn.executescript(load_sql("etl_create_unique_index.sql"))
 
 
 def rebuild_marts(conn: sqlite3.Connection) -> None:
-    query_monthly = """
-        SELECT
-            strftime('%Y-%m', InvoiceDate) AS year_month,
-            SUM(line_total) AS revenue,
-            SUM(Quantity) AS units,
-            COUNT(DISTINCT InvoiceNo) AS invoices
-        FROM stg_sales_clean
-        GROUP BY year_month
-        ORDER BY year_month
-    """
+    """מחשב מחדש את כל טבלאות ה־mart מתוך staging."""
+    query_monthly = load_sql("marts_monthly.sql")
     monthly = pd.read_sql_query(query_monthly, conn)
     monthly.to_sql("mart_sales_monthly", conn, if_exists="replace", index=False)
 
-    query_product = """
-        SELECT
-            StockCode,
-            Description,
-            SUM(line_total) AS revenue,
-            SUM(Quantity) AS units,
-            COUNT(DISTINCT InvoiceNo) AS invoices
-        FROM stg_sales_clean
-        GROUP BY StockCode, Description
-        ORDER BY revenue DESC
-    """
+    query_product = load_sql("marts_product.sql")
     product = pd.read_sql_query(query_product, conn)
     product.to_sql("mart_product_summary", conn, if_exists="replace", index=False)
 
-    query_country = """
-        SELECT
-            Country,
-            SUM(line_total) AS revenue,
-            SUM(Quantity) AS units,
-            COUNT(DISTINCT InvoiceNo) AS invoices,
-            COUNT(DISTINCT CustomerID) AS customers
-        FROM stg_sales_clean
-        GROUP BY Country
-        ORDER BY revenue DESC
-    """
+    query_country = load_sql("marts_country.sql")
     country = pd.read_sql_query(query_country, conn)
     country.to_sql("mart_country_summary", conn, if_exists="replace", index=False)
 
-    query_customer = """
-        SELECT
-            CustomerID,
-            SUM(line_total) AS revenue,
-            SUM(Quantity) AS units,
-            COUNT(DISTINCT InvoiceNo) AS invoices
-        FROM stg_sales_clean
-        GROUP BY CustomerID
-        ORDER BY revenue DESC
-    """
+    query_customer = load_sql("marts_customer.sql")
     customer = pd.read_sql_query(query_customer, conn)
     customer.to_sql("mart_customer_summary", conn, if_exists="replace", index=False)
 
 
 def write_sqlite(clean_df: pd.DataFrame, db_path: Optional[Path] = None) -> Path:
-    """Write staging and mart tables into a SQLite database (single transaction)."""
+    """טעינה מלאה: staging + marts בתוך עסקת SQLite אחת."""
     paths = get_paths()
     if db_path is None:
         db_path = paths.db_dir / "retail.db"
@@ -154,8 +104,7 @@ def write_sqlite(clean_df: pd.DataFrame, db_path: Optional[Path] = None) -> Path
     conn = sqlite3.connect(db_path)
     try:
         conn.execute("BEGIN IMMEDIATE")
-        conn.execute("DROP TABLE IF EXISTS stg_sales_clean")
-        conn.execute("DROP INDEX IF EXISTS ux_sales_key")
+        conn.executescript(load_sql("etl_drop_staging.sql"))
         _init_staging(conn, use_unique_index=False)
         clean_df.to_sql("stg_sales_clean", conn, if_exists="append", index=False)
         rebuild_marts(conn)
@@ -189,8 +138,7 @@ def _insert_incremental(conn: sqlite3.Connection, df: pd.DataFrame) -> int:
         "Country",
         "line_total",
     ]
-    placeholders = ",".join(["?"] * len(cols))
-    sql = f"INSERT OR IGNORE INTO stg_sales_clean ({','.join(cols)}) VALUES ({placeholders})"
+    sql = load_sql("etl_insert_incremental.sql")
     before = conn.total_changes
     conn.executemany(sql, df[cols].itertuples(index=False, name=None))
     after = conn.total_changes
@@ -205,7 +153,7 @@ def run_etl(
     cfg: Optional[CleanConfig] = None,
     chunksize: int = 200_000,
 ) -> Path:
-    """Convenience function: load CSV, clean, and write SQLite marts."""
+    """מריץ ETL: מצב full (החלפה) או incremental (הוספה + אינדקס ייחודי)."""
     paths = get_paths()
     if csv_path is None:
         csv_path = paths.raw_dir / "retail_sales.csv"
@@ -221,14 +169,14 @@ def run_etl(
         return write_sqlite(clean_df, db_path=db_path)
 
     if mode != "incremental":
-        raise ValueError("mode must be 'full' or 'incremental'")
+        raise ValueError("mode חייב להיות 'full' או 'incremental'")
 
     logger.info("ETL incremental load from %s", csv_path)
     conn = sqlite3.connect(db_path)
     try:
         conn.execute("BEGIN IMMEDIATE")
         _init_staging(conn, use_unique_index=True)
-        row = conn.execute("SELECT MAX(InvoiceDate) FROM stg_sales_clean").fetchone()
+        row = conn.execute(load_sql("etl_select_max_invoice_date.sql")).fetchone()
         last_max = row[0]
         last_max_dt = pd.to_datetime(last_max) if last_max else None
 

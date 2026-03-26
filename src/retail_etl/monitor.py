@@ -1,3 +1,5 @@
+"""זיהוי שינוי בקובץ גולמי, השוואת סכימה והפעלת ETL לפי הצורך."""
+
 from __future__ import annotations
 
 import json
@@ -7,10 +9,10 @@ from typing import Optional
 
 import pandas as pd
 
-from .constants import EXPECTED_RAW_COLUMNS
+from .db_security import EXPECTED_RAW_COLUMNS
 from .etl import CleanConfig, run_etl
 from .ingest_kaggle import FileFingerprint, _sha256_file
-from .logging_config import get_logger
+from .utils import get_logger
 from .meta import (
     add_alert,
     clear_alerts,
@@ -30,6 +32,7 @@ logger = get_logger(__name__)
 
 @dataclass(frozen=True)
 class Profile:
+    """תמונת מצב של קובץ CSV (עמודות, טיפוסים לדוגמה, מספר שורות)."""
     columns: list[str]
     dtypes: dict[str, str]
     row_count: int
@@ -41,15 +44,15 @@ def fingerprint_file(path: Path) -> FileFingerprint:
 
 
 def profile_csv(csv_path: Path, chunksize: int = 200_000) -> Profile:
-    # Read only header for columns
+    # כותרות בלבד
     header = pd.read_csv(csv_path, nrows=0)
     columns = list(header.columns)
 
-    # Determine dtypes roughly from a sample (first chunk)
+    # טיפוסים משוערים מדגימה קטנה
     sample = pd.read_csv(csv_path, nrows=10_000)
     dtypes = {c: str(sample[c].dtype) for c in sample.columns}
 
-    # Row count and max InvoiceDate computed via chunking
+    # ספירת שורות ותאריך מקסימלי בצ'אנקים
     row_count = 0
     max_dt = None
     for chunk in pd.read_csv(csv_path, chunksize=chunksize):
@@ -73,11 +76,7 @@ def check_for_update(
     allow_incremental: bool = True,
     download_first: bool = False,
 ) -> dict:
-    """
-    Compare current raw file to the last stored fingerprint and decide whether to run ETL.
-
-    Returns a status dict suitable for displaying in the dashboard.
-    """
+    """משווה טביעת אצבע לקובץ הנוכחי מול המטא; מחזיר מילון סטטוס לדשבורד."""
     paths = get_paths()
     if csv_path is None:
         csv_path = paths.raw_dir / filename

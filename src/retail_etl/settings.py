@@ -1,4 +1,4 @@
-"""Runtime configuration from environment variables (12-factor style)."""
+"""הגדרות זמן ריצה ממשתני סביבה."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from .paths import ProjectPaths, get_paths
 
 @dataclass(frozen=True)
 class Settings:
-    """Application settings loaded once per process."""
+    """ערכי קונפיגורציה לתהליך."""
 
     db_path: Path
     raw_csv_default: Path

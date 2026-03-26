@@ -1,3 +1,5 @@
+"""יצירת קבצי גרף Plotly (HTML/PNG) מתוך טבלאות mart."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,7 +9,7 @@ import sqlite3
 import pandas as pd
 
 from .paths import get_paths
-from .sql_guard import assert_export_table
+from .db_security import assert_export_table
 
 
 def _ensure_parent(path: Path) -> None:
@@ -21,7 +23,7 @@ def _read_table(db_path: Path, table: str) -> pd.DataFrame:
 
 
 def generate_charts(db_path: Path | None = None) -> None:
-    """Create Plotly charts (HTML + PNG) for key marts."""
+    """שומר גרפים עיקריים לתיקיית הדוחות."""
     paths = get_paths()
     if db_path is None:
         db_path = paths.db_dir / "retail.db"
@@ -33,7 +35,7 @@ def generate_charts(db_path: Path | None = None) -> None:
         monthly,
         x="year_month",
         y="revenue",
-        title="Monthly Revenue Over Time",
+        title="הכנסה חודשית לאורך זמן",
     )
     _save_figure(fig_monthly, charts_dir / "monthly_revenue")
 
@@ -42,9 +44,9 @@ def generate_charts(db_path: Path | None = None) -> None:
         products,
         x="Description",
         y="revenue",
-        title="Top 10 Products by Revenue",
+        title="10 המוצרים המובילים לפי הכנסה",
     )
-    fig_products.update_layout(xaxis_title="Product", xaxis_tickangle=-45)
+    fig_products.update_layout(xaxis_title="מוצר", xaxis_tickangle=-45)
     _save_figure(fig_products, charts_dir / "top_products")
 
     customers = _read_table(db_path, "mart_customer_summary").head(10)
@@ -52,7 +54,7 @@ def generate_charts(db_path: Path | None = None) -> None:
         customers,
         x="CustomerID",
         y="revenue",
-        title="Top 10 Customers by Revenue",
+        title="10 הלקוחות המובילים לפי הכנסה",
     )
     _save_figure(fig_customers, charts_dir / "top_customers")
 
@@ -61,7 +63,7 @@ def generate_charts(db_path: Path | None = None) -> None:
         countries,
         x="Country",
         y="revenue",
-        title="Top 10 Countries by Revenue",
+        title="10 המדינות המובילות לפי הכנסה",
     )
     fig_countries.update_layout(xaxis_tickangle=-45)
     _save_figure(fig_countries, charts_dir / "top_countries")

@@ -1,3 +1,5 @@
+"""ממשק שורת פקודה ל־ETL, ייצוא וגרפים."""
+
 from __future__ import annotations
 
 import argparse
@@ -7,7 +9,7 @@ from pathlib import Path
 
 from .etl import run_etl
 from .exporter import export_tables
-from .logging_config import configure_logging, get_logger
+from .utils import configure_logging, get_logger
 from .paths import get_paths
 from .plotting import generate_charts
 from .settings import Settings
@@ -16,64 +18,64 @@ logger = get_logger(__name__)
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(prog="retail-etl", description="Retail sales ETL and analysis")
+    parser = argparse.ArgumentParser(prog="retail-etl", description="ניתוח מכירות קמעונאות — ETL ודוחות")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    ingest = sub.add_parser("ingest", help="Download raw dataset file from Kaggle")
-    ingest.add_argument("--dataset", required=True, help="Kaggle dataset identifier (owner/dataset)")
-    ingest.add_argument("--filename", required=True, help="Filename inside the Kaggle dataset")
-    ingest.add_argument("--force", action="store_true", help="Force re-download")
+    ingest = sub.add_parser("ingest", help="הורדת קובץ גולמי מקגל")
+    ingest.add_argument("--dataset", required=True, help="מזהה מערך (בעלים/שם)")
+    ingest.add_argument("--filename", required=True, help="שם הקובץ בתוך המערך")
+    ingest.add_argument("--force", action="store_true", help="להוריד מחדש גם אם הקובץ קיים")
 
-    monitor = sub.add_parser("monitor", help="Check for updates and refresh ETL if needed")
-    monitor.add_argument("--dataset", required=True, help="Kaggle dataset identifier (owner/dataset)")
-    monitor.add_argument("--filename", required=True, help="Filename (local raw file name)")
-    monitor.add_argument("--allow-incremental", action="store_true", help="Allow incremental load when safe")
+    monitor = sub.add_parser("monitor", help="בדיקת עדכון ורענון ETL לפי הצורך")
+    monitor.add_argument("--dataset", required=True, help="מזהה מערך (בעלים/שם)")
+    monitor.add_argument("--filename", required=True, help="שם הקובץ המקומי ב־data/raw")
+    monitor.add_argument("--allow-incremental", action="store_true", help="לאפשר טעינה מצטברת כשזה בטוח")
     monitor.add_argument(
         "--download",
         action="store_true",
-        help="Download latest file from Kaggle before comparing fingerprints",
+        help="להוריד מקגל לפני השוואת טביעת אצבע",
     )
 
-    watch = sub.add_parser("watch", help="Poll for updates every N seconds (local monitoring)")
-    watch.add_argument("--dataset", required=True, help="Kaggle dataset identifier (owner/dataset)")
-    watch.add_argument("--filename", required=True, help="Filename (local raw file name)")
-    watch.add_argument("--interval-seconds", type=int, default=300, help="Polling interval in seconds")
+    watch = sub.add_parser("watch", help="בדיקה חוזרת כל N שניות")
+    watch.add_argument("--dataset", required=True, help="מזהה מערך (בעלים/שם)")
+    watch.add_argument("--filename", required=True, help="שם הקובץ המקומי")
+    watch.add_argument("--interval-seconds", type=int, default=300, help="מרווח בשניות בין בדיקות")
     watch.add_argument(
         "--pull",
         action="store_true",
-        help="Download from Kaggle on each iteration before fingerprint check",
+        help="בכל מחזור: הורדה מקגל לפני בדיקה",
     )
 
-    run_all = sub.add_parser("run-all", help="Run full pipeline (ingest, monitor, exports, charts)")
-    run_all.add_argument("--dataset", default=None, help="Kaggle dataset identifier (owner/dataset)")
-    run_all.add_argument("--filename", default=None, help="Filename inside Kaggle dataset (e.g. retail_sales.csv)")
+    run_all = sub.add_parser("run-all", help="הרצת צינור מלא (אופציונלי: קגל, ייצוא, גרפים)")
+    run_all.add_argument("--dataset", default=None, help="מזהה מערך (בעלים/שם)")
+    run_all.add_argument("--filename", default=None, help="שם קובץ במערך (למשל retail_sales.csv)")
     run_all.add_argument(
         "--csv-path",
         type=Path,
         default=None,
-        help="Optional path to retail_sales.csv (defaults to data/raw/retail_sales.csv)",
+        help="נתיב ל־CSV (ברירת מחדל: data/raw/retail_sales.csv)",
     )
     run_all.add_argument(
         "--db-path",
         type=Path,
         default=None,
-        help="Optional destination SQLite DB path (defaults to data/db/retail.db)",
+        help="נתיב ל־SQLite (ברירת מחדל: data/db/retail.db)",
     )
 
-    export_cmd = sub.add_parser("export", help="Export mart tables to files")
+    export_cmd = sub.add_parser("export", help="ייצוא טבלאות mart לקבצים")
     export_cmd.add_argument(
         "--db-path",
         type=Path,
         default=None,
-        help="SQLite DB path (defaults to data/db/retail.db)",
+        help="נתיב מסד SQLite (ברירת מחדל: data/db/retail.db)",
     )
 
-    plot_cmd = sub.add_parser("plot", help="Generate Plotly charts from marts")
+    plot_cmd = sub.add_parser("plot", help="יצירת גרפי Plotly מה־marts")
     plot_cmd.add_argument(
         "--db-path",
         type=Path,
         default=None,
-        help="SQLite DB path (defaults to data/db/retail.db)",
+        help="נתיב מסד SQLite (ברירת מחדל: data/db/retail.db)",
     )
 
     return parser.parse_args(argv)
@@ -84,7 +86,7 @@ def main(argv: list[str] | None = None) -> None:
         argv = sys.argv[1:]
 
     pre = argparse.ArgumentParser(add_help=False)
-    pre.add_argument("--log-level", default=None, help="Logging level (default: RETAIL_ETL_LOG_LEVEL or INFO)")
+    pre.add_argument("--log-level", default=None, help="רמת לוג (ברירת מחדל: RETAIL_ETL_LOG_LEVEL או INFO)")
     known, rest = pre.parse_known_args(argv)
     settings = Settings.load()
     configure_logging(known.log_level or settings.log_level)
@@ -101,7 +103,7 @@ def main(argv: list[str] | None = None) -> None:
             dest_path=paths.raw_dir / args.filename,
             force=args.force,
         )
-        print(f"Downloaded: {fp.path} ({fp.size_bytes} bytes)")
+        print(f"הורדה הושלמה: {fp.path} ({fp.size_bytes} בתים)")
         print(f"sha256: {fp.sha256}")
 
     elif args.command == "monitor":
@@ -113,7 +115,7 @@ def main(argv: list[str] | None = None) -> None:
             allow_incremental=args.allow_incremental,
             download_first=args.download,
         )
-        print(f"Monitor result: {result}")
+        print(f"תוצאת ניטור: {result}")
 
     elif args.command == "watch":
         from .monitor import check_for_update
@@ -126,7 +128,7 @@ def main(argv: list[str] | None = None) -> None:
                 allow_incremental=True,
                 download_first=args.pull,
             )
-            print(f"[watch] {result}")
+            print(f"[מעקב] {result}")
             time.sleep(interval)
 
     elif args.command == "run-all":
@@ -154,19 +156,19 @@ def main(argv: list[str] | None = None) -> None:
 
         export_tables(db_path=db_path)
         generate_charts(db_path=db_path)
-        print(f"Full pipeline completed. SQLite DB: {db_path}")
-        print(f"Exports written under: {paths.exports_dir}")
-        print(f"Charts written under: {paths.charts_dir}")
+        print(f"צינור הושלם. SQLite: {db_path}")
+        print(f"ייצואים: {paths.exports_dir}")
+        print(f"גרפים: {paths.charts_dir}")
 
     elif args.command == "export":
         db_path = args.db_path or settings.db_path
         export_tables(db_path=db_path)
-        print(f"Exports written under: {paths.exports_dir}")
+        print(f"ייצואים: {paths.exports_dir}")
 
     elif args.command == "plot":
         db_path = args.db_path or settings.db_path
         generate_charts(db_path=db_path)
-        print(f"Charts written under: {paths.charts_dir}")
+        print(f"גרפים: {paths.charts_dir}")
 
 
 if __name__ == "__main__":

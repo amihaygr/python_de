@@ -1,4 +1,4 @@
-"""Structured logging setup for CLI and library code."""
+"""עזרי לוג לשימוש חוזר."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import sys
 
 
 def configure_logging(level: str = "INFO") -> None:
-    """Configure root logger once (idempotent for repeated calls in tests)."""
+    """מגדיר את ה-root logger פעם אחת (קריאות חוזרות רק מעדכנות רמה)."""
     numeric = getattr(logging, level.upper(), logging.INFO)
     root = logging.getLogger()
     if root.handlers:
@@ -23,3 +23,4 @@ def configure_logging(level: str = "INFO") -> None:
 
 def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(name)
+

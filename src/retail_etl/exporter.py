@@ -1,3 +1,5 @@
+"""ייצוא טבלאות mart מ־SQLite לפורמטים שונים."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,7 +9,7 @@ import pandas as pd
 import sqlite3
 
 from .paths import get_paths
-from .sql_guard import assert_export_table
+from .db_security import assert_export_table
 
 
 def _ensure_parent(path: Path) -> None:
@@ -24,7 +26,7 @@ def export_tables(
     tables: Iterable[str] | None = None,
     formats: Iterable[str] | None = None,
 ) -> None:
-    """Export mart tables from SQLite into multiple file formats."""
+    """כותב כל טבלה לפורמטים שנבחרו (למשל CSV, Parquet)."""
     paths = get_paths()
     if db_path is None:
         db_path = paths.db_dir / "retail.db"

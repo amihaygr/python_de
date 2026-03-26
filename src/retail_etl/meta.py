@@ -1,3 +1,5 @@
+"""טבלאות מטא ב־SQLite: מקור, סכימה, ריצות, התראות."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -8,6 +10,7 @@ from typing import Any, Optional
 import sqlite3
 
 from .paths import get_paths
+from .sql_loader import load_sql
 
 
 def utc_now_iso() -> str:
@@ -27,52 +30,7 @@ def connect(db_path: Optional[Path] = None) -> sqlite3.Connection:
 
 
 def init_meta_tables(conn: sqlite3.Connection) -> None:
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS meta_source_state (
-            id INTEGER PRIMARY KEY CHECK (id = 1),
-            dataset TEXT,
-            filename TEXT,
-            size_bytes INTEGER,
-            sha256 TEXT,
-            updated_at TEXT
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS meta_schema_state (
-            id INTEGER PRIMARY KEY CHECK (id = 1),
-            columns_json TEXT,
-            dtypes_json TEXT,
-            updated_at TEXT
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS meta_pipeline_runs (
-            run_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            started_at TEXT,
-            finished_at TEXT,
-            mode TEXT,
-            rows_written INTEGER,
-            status TEXT,
-            error TEXT
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS meta_alerts (
-            alert_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            created_at TEXT,
-            kind TEXT,
-            message TEXT,
-            active INTEGER DEFAULT 1
-        )
-        """
-    )
+    conn.executescript(load_sql("meta_init_tables.sql"))
     conn.commit()
 
 
@@ -84,27 +42,13 @@ def upsert_source_state(
     sha256: str,
 ) -> None:
     init_meta_tables(conn)
-    conn.execute(
-        """
-        INSERT INTO meta_source_state (id, dataset, filename, size_bytes, sha256, updated_at)
-        VALUES (1, ?, ?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-            dataset=excluded.dataset,
-            filename=excluded.filename,
-            size_bytes=excluded.size_bytes,
-            sha256=excluded.sha256,
-            updated_at=excluded.updated_at
-        """,
-        (dataset, filename, size_bytes, sha256, utc_now_iso()),
-    )
+    conn.execute(load_sql("meta_upsert_source_state.sql"), (dataset, filename, size_bytes, sha256, utc_now_iso()))
     conn.commit()
 
 
 def get_source_state(conn: sqlite3.Connection) -> Optional[dict[str, Any]]:
     init_meta_tables(conn)
-    row = conn.execute(
-        "SELECT dataset, filename, size_bytes, sha256, updated_at FROM meta_source_state WHERE id = 1"
-    ).fetchone()
+    row = conn.execute(load_sql("meta_get_source_state.sql")).fetchone()
     if not row:
         return None
     return {
@@ -118,27 +62,22 @@ def get_source_state(conn: sqlite3.Connection) -> Optional[dict[str, Any]]:
 
 def add_alert(conn: sqlite3.Connection, kind: str, message: str) -> None:
     init_meta_tables(conn)
-    conn.execute(
-        "INSERT INTO meta_alerts (created_at, kind, message, active) VALUES (?, ?, ?, 1)",
-        (utc_now_iso(), kind, message),
-    )
+    conn.execute(load_sql("meta_add_alert.sql"), (utc_now_iso(), kind, message))
     conn.commit()
 
 
 def clear_alerts(conn: sqlite3.Connection, kind: Optional[str] = None) -> None:
     init_meta_tables(conn)
     if kind is None:
-        conn.execute("UPDATE meta_alerts SET active = 0 WHERE active = 1")
+        conn.execute(load_sql("meta_clear_alerts_all.sql"))
     else:
-        conn.execute("UPDATE meta_alerts SET active = 0 WHERE active = 1 AND kind = ?", (kind,))
+        conn.execute(load_sql("meta_clear_alerts_by_kind.sql"), (kind,))
     conn.commit()
 
 
 def list_active_alerts(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     init_meta_tables(conn)
-    rows = conn.execute(
-        "SELECT alert_id, created_at, kind, message FROM meta_alerts WHERE active = 1 ORDER BY alert_id DESC"
-    ).fetchall()
+    rows = conn.execute(load_sql("meta_list_active_alerts.sql")).fetchall()
     return [{"alert_id": r[0], "created_at": r[1], "kind": r[2], "message": r[3]} for r in rows]
 
 
@@ -151,10 +90,7 @@ class RunRecord:
 def start_run(conn: sqlite3.Connection, mode: str) -> RunRecord:
     init_meta_tables(conn)
     started = utc_now_iso()
-    cur = conn.execute(
-        "INSERT INTO meta_pipeline_runs (started_at, mode, status) VALUES (?, ?, ?)",
-        (started, mode, "running"),
-    )
+    cur = conn.execute(load_sql("meta_start_run.sql"), (started, mode, "running"))
     conn.commit()
     return RunRecord(run_id=int(cur.lastrowid), started_at=started)
 
@@ -168,14 +104,7 @@ def finish_run(
     error: Optional[str] = None,
 ) -> None:
     init_meta_tables(conn)
-    conn.execute(
-        """
-        UPDATE meta_pipeline_runs
-        SET finished_at = ?, status = ?, rows_written = ?, error = ?
-        WHERE run_id = ?
-        """,
-        (utc_now_iso(), status, rows_written, error, run_id),
-    )
+    conn.execute(load_sql("meta_finish_run.sql"), (utc_now_iso(), status, rows_written, error, run_id))
     conn.commit()
 
 
@@ -186,31 +115,13 @@ def upsert_schema_state(
     dtypes_json: str,
 ) -> None:
     init_meta_tables(conn)
-    conn.execute(
-        """
-        INSERT INTO meta_schema_state (id, columns_json, dtypes_json, updated_at)
-        VALUES (1, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-            columns_json=excluded.columns_json,
-            dtypes_json=excluded.dtypes_json,
-            updated_at=excluded.updated_at
-        """,
-        (columns_json, dtypes_json, utc_now_iso()),
-    )
+    conn.execute(load_sql("meta_upsert_schema_state.sql"), (columns_json, dtypes_json, utc_now_iso()))
     conn.commit()
 
 
 def get_last_success(conn: sqlite3.Connection) -> Optional[dict[str, Any]]:
     init_meta_tables(conn)
-    row = conn.execute(
-        """
-        SELECT run_id, finished_at, mode, rows_written
-        FROM meta_pipeline_runs
-        WHERE status = 'success'
-        ORDER BY run_id DESC
-        LIMIT 1
-        """
-    ).fetchone()
+    row = conn.execute(load_sql("meta_get_last_success.sql")).fetchone()
     if not row:
         return None
     return {"run_id": row[0], "finished_at": row[1], "mode": row[2], "rows_written": row[3]}

@@ -1,0 +1,24 @@
+---
+description: After code changes, commit/push to git and refresh Streamlit (Docker on 8501)
+alwaysApply: true
+---
+
+# Git + Streamlit refresh after tasks
+
+When the user’s request **changes project code or config** (not for pure Q&A):
+
+1. **Git**
+   - Run `git status`. If there are changes: `git add -A`, `git commit` with a clear English or Hebrew message, `git push` to the current branch (usually `dev`).
+   - If the working tree is clean, say so explicitly; do not create empty commits.
+
+2. **Streamlit / Docker**
+   - Assume the app is served via **Docker** on **port 8501** (image `retail-etl:latest`, container name `retail-etl-8501`).
+   - After substantive UI or `app.py` / `src/` changes, **rebuild and restart** so the user sees updates without manual steps:
+     - From repo root: `docker build -t retail-etl:latest .`
+     - `docker rm -f retail-etl-8501` (ignore error if missing)
+     - `docker run -d --name retail-etl-8501 -p 8501:8501 -v "<REPO>\data:/app/data" retail-etl:latest`
+     - Use the actual workspace path for `<REPO>` (e.g. `C:\Users\Amichai\Documents\naya_college_de\repos\python_de`).
+   - If the user runs Streamlit **locally** instead of Docker, note that they should restart `streamlit run app.py` themselves, or offer the equivalent command.
+
+3. **Order**
+   - Implement the fix → **pytest** if tests exist → **git** → **Docker rebuild/run** → short summary for the user.

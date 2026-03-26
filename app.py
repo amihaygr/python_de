@@ -18,8 +18,10 @@ from retail_etl.local_time import format_utc_iso_as_israel, localize_alert_rows
 from retail_etl.meta import connect as meta_connect, get_last_success, get_source_state, list_active_alerts
 from retail_etl.monitor import check_for_update
 from retail_etl.presentation import APP_STYLE, project_root_from_app, render_architecture_presentation
-from retail_etl.settings import Settings
+from retail_etl.settings import DEFAULT_RETAIL_KAGGLE_DATASET, Settings
 from retail_etl.utils import configure_logging
+
+_KAGGLE_PLACEHOLDER_SLUGS = frozenset({"owner/dataset-name"})
 
 
 def _default_kaggle_dataset() -> str:
@@ -27,10 +29,14 @@ def _default_kaggle_dataset() -> str:
         sec = st.secrets
         if hasattr(sec, "get"):
             v = sec.get("RETAIL_KAGGLE_DATASET", "")
-            return str(v) if v else ""
+            if v:
+                return str(v)
     except Exception:
         pass
-    return os.environ.get("RETAIL_KAGGLE_DATASET", "").strip()
+    v = os.environ.get("RETAIL_KAGGLE_DATASET", "").strip()
+    if v:
+        return v
+    return DEFAULT_RETAIL_KAGGLE_DATASET
 
 
 def _default_kaggle_filename() -> str:
@@ -122,8 +128,17 @@ def main() -> None:
     dataset = st.sidebar.text_input(
         "Kaggle dataset slug",
         value=_default_kaggle_dataset(),
-        placeholder="owner/dataset-name",
+        placeholder="owner/dataset from kaggle.com/datasets/…",
+        help=(
+            "Copy from the dataset URL after `/datasets/`. "
+            f"Project default: `{DEFAULT_RETAIL_KAGGLE_DATASET}`."
+        ),
     )
+    if dataset.strip().lower() in {s.lower() for s in _KAGGLE_PLACEHOLDER_SLUGS}:
+        st.sidebar.warning(
+            "`owner/dataset-name` is only an example. Paste the real slug from Kaggle "
+            f"(this project defaults to `{DEFAULT_RETAIL_KAGGLE_DATASET}`)."
+        )
     filename = st.sidebar.text_input("File name inside dataset", value=_default_kaggle_filename())
     allow_incremental = st.sidebar.checkbox("Allow incremental load when safe", value=True)
     download_from_kaggle = st.sidebar.checkbox(
@@ -250,12 +265,18 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
             )
 
         if st.button("Run refresh check", type="primary"):
-            if not dataset.strip():
+            slug = dataset.strip()
+            if not slug:
                 st.warning("Enter a Kaggle dataset slug in the sidebar (format: owner/dataset).")
+            elif slug.lower() in {s.lower() for s in _KAGGLE_PLACEHOLDER_SLUGS}:
+                st.warning(
+                    "Replace the example slug with a real dataset from Kaggle "
+                    f"(e.g. `{DEFAULT_RETAIL_KAGGLE_DATASET}`)."
+                )
             else:
                 try:
                     result = check_for_update(
-                        dataset=dataset.strip(),
+                        dataset=slug,
                         filename=filename.strip(),
                         allow_incremental=allow_incremental,
                         db_path=db_path,

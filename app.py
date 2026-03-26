@@ -15,7 +15,7 @@ import streamlit as st
 from retail_etl.analytics import RetailAnalytics
 from retail_etl.db_security import assert_read_table
 from retail_etl.local_time import format_utc_iso_as_israel, localize_alert_rows
-from retail_etl.meta import connect as meta_connect, get_last_success, get_source_state, list_active_alerts
+from retail_etl.meta import clear_alerts, connect as meta_connect, get_last_success, get_source_state, list_active_alerts
 from retail_etl.monitor import check_for_update
 from retail_etl.presentation import APP_STYLE, project_root_from_app, render_architecture_presentation
 from retail_etl.settings import DEFAULT_RETAIL_KAGGLE_DATASET, DEFAULT_RETAIL_KAGGLE_FILENAME, Settings
@@ -269,6 +269,12 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
                 pd.DataFrame(localize_alert_rows(alerts)),
                 use_container_width=True,
             )
+            if any(a.get("kind") == "etl_failure" for a in alerts):
+                if st.button("Clear ETL failure alerts (keep schema alerts)"):
+                    with meta_connect(db_path) as conn:
+                        clear_alerts(conn, kind="etl_failure")
+                    st.cache_data.clear()
+                    st.rerun()
 
         if st.button("Run refresh check", type="primary"):
             slug = dataset.strip()

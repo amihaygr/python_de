@@ -134,6 +134,7 @@ def check_for_update(
                     dtypes_json=json.dumps(prof0.dtypes),
                 )
                 finish_run(conn, run.run_id, status="success", rows_written=0)
+                clear_alerts(conn, kind="etl_failure")
             except Exception as e:  # noqa: BLE001
                 add_alert(conn, "etl_failure", str(e))
                 finish_run(conn, run.run_id, status="failed", error=str(e))
@@ -176,6 +177,7 @@ def check_for_update(
             run_etl(csv_path=csv_path, db_path=db_path, mode=mode, cfg=CleanConfig())
             upsert_source_state(conn, dataset, filename, fp.size_bytes, fp.sha256)
             finish_run(conn, run.run_id, status="success", rows_written=0)
+            clear_alerts(conn, kind="etl_failure")
         except Exception as e:  # noqa: BLE001
             add_alert(conn, "etl_failure", str(e))
             finish_run(conn, run.run_id, status="failed", error=str(e))

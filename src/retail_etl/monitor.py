@@ -46,16 +46,20 @@ def fingerprint_file(path: Path) -> FileFingerprint:
 def profile_csv(csv_path: Path, chunksize: int = 200_000) -> Profile:
     # כותרות בלבד
     header = pd.read_csv(csv_path, nrows=0)
-    columns = list(header.columns)
+    columns = [c for c in header.columns if c != "index"]
 
     # טיפוסים משוערים מדגימה קטנה
     sample = pd.read_csv(csv_path, nrows=10_000)
+    if "index" in sample.columns:
+        sample = sample.drop(columns=["index"])
     dtypes = {c: str(sample[c].dtype) for c in sample.columns}
 
     # ספירת שורות ותאריך מקסימלי בצ'אנקים
     row_count = 0
     max_dt = None
     for chunk in pd.read_csv(csv_path, chunksize=chunksize):
+        if "index" in chunk.columns:
+            chunk = chunk.drop(columns=["index"])
         row_count += len(chunk)
         if "InvoiceDate" in chunk.columns:
             dt = pd.to_datetime(chunk["InvoiceDate"], dayfirst=True, errors="coerce")

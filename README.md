@@ -1,7 +1,7 @@
 ## Retail Sales ETL Project
 
 Python ETL project for the Naya College Data Engineering course, based on the Online Retail
-`retail_sales.csv` dataset from Kaggle.
+Online Retail–style CSV (default: `online_retail.csv` from `dp1224/online-retail-csv` on Kaggle).
 
 ### Goals (from the presentation)
 
@@ -48,7 +48,7 @@ python -m retail_etl.cli run-all
 
 This command:
 
-- Loads `data/raw/retail_sales.csv`.
+- Loads `data/raw/online_retail.csv` (or `RETAIL_ETL_RAW_CSV`).
 - Cleans and enriches the data with Pandas.
 - Writes staging and mart tables into `data/db/retail.db`.
 - Exports marts to `data/exports/` as CSV/JSON/Parquet/XLSX.

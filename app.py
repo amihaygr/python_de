@@ -18,7 +18,7 @@ from retail_etl.local_time import format_utc_iso_as_israel, localize_alert_rows
 from retail_etl.meta import connect as meta_connect, get_last_success, get_source_state, list_active_alerts
 from retail_etl.monitor import check_for_update
 from retail_etl.presentation import APP_STYLE, project_root_from_app, render_architecture_presentation
-from retail_etl.settings import DEFAULT_RETAIL_KAGGLE_DATASET, Settings
+from retail_etl.settings import DEFAULT_RETAIL_KAGGLE_DATASET, DEFAULT_RETAIL_KAGGLE_FILENAME, Settings
 from retail_etl.utils import configure_logging
 
 _KAGGLE_PLACEHOLDER_SLUGS = frozenset({"owner/dataset-name"})
@@ -48,7 +48,10 @@ def _default_kaggle_filename() -> str:
                 return str(v)
     except Exception:
         pass
-    return os.environ.get("RETAIL_KAGGLE_FILENAME", "retail_sales.csv").strip() or "retail_sales.csv"
+    v = os.environ.get("RETAIL_KAGGLE_FILENAME", "").strip()
+    if v:
+        return v
+    return DEFAULT_RETAIL_KAGGLE_FILENAME
 
 
 def get_connection(db_path: Path) -> sqlite3.Connection:
@@ -207,7 +210,7 @@ def main() -> None:
         if executive:
             st.markdown(
                 """
-**What you are seeing:** cleaned online-retail style line items from `retail_sales.csv`, aggregated into
+**What you are seeing:** cleaned online-retail style line items from the raw CSV, aggregated into
 trusted **mart** tables for leadership-ready charts.
 
 **Why it matters:** one governed path from raw file → validated staging → metrics you can defend in review.
@@ -519,7 +522,7 @@ For engineering depth, switch sidebar mode to **Technical** or open the **Archit
                 """
 ### Project summary (technical)
 
-**1. ETL** — `data/raw/retail_sales.csv` → `clean_sales` → `stg_sales_clean` → mart tables (`mart_*`).
+**1. ETL** — `data/raw/` CSV (default `online_retail.csv`) → `clean_sales` → `stg_sales_clean` → mart tables (`mart_*`).
 
 **2. Monitoring & Kaggle** — `ingest_kaggle.py` downloads; `monitor.py` compares fingerprints and schema vs
 `EXPECTED_RAW_COLUMNS`; alerts in `meta_*` tables.

@@ -10,6 +10,7 @@ import pandas as pd
 import sqlite3
 
 from .paths import get_paths
+from .settings import DEFAULT_RETAIL_KAGGLE_FILENAME
 from .sql_loader import load_sql
 
 import logging
@@ -26,12 +27,19 @@ class CleanConfig:
     drop_missing_customer: bool = True
 
 
+def _strip_optional_index_column(df: pd.DataFrame) -> pd.DataFrame:
+    """Some Kaggle exports add a redundant `index` column."""
+    if "index" in df.columns:
+        return df.drop(columns=["index"])
+    return df
+
+
 def load_raw_csv(path: Optional[Path] = None) -> pd.DataFrame:
     """קורא את קובץ ה־CSV הגולמי ל־DataFrame."""
     if path is None:
-        path = get_paths().raw_dir / "retail_sales.csv"
+        path = get_paths().raw_dir / DEFAULT_RETAIL_KAGGLE_FILENAME
     df = pd.read_csv(path)
-    return df
+    return _strip_optional_index_column(df)
 
 
 def clean_sales(df: pd.DataFrame, cfg: Optional[CleanConfig] = None) -> pd.DataFrame:
@@ -39,6 +47,7 @@ def clean_sales(df: pd.DataFrame, cfg: Optional[CleanConfig] = None) -> pd.DataF
     cfg = cfg or CleanConfig()
 
     df = df.copy()
+    df = _strip_optional_index_column(df)
 
     df["InvoiceDate"] = pd.to_datetime(df["InvoiceDate"], dayfirst=True, errors="coerce")
 
@@ -156,7 +165,7 @@ def run_etl(
     """מריץ ETL: מצב full (החלפה) או incremental (הוספה + אינדקס ייחודי)."""
     paths = get_paths()
     if csv_path is None:
-        csv_path = paths.raw_dir / "retail_sales.csv"
+        csv_path = paths.raw_dir / DEFAULT_RETAIL_KAGGLE_FILENAME
     if db_path is None:
         db_path = paths.db_dir / "retail.db"
 
@@ -182,6 +191,7 @@ def run_etl(
 
         inserted = 0
         for chunk in pd.read_csv(csv_path, chunksize=chunksize):
+            chunk = _strip_optional_index_column(chunk)
             if "InvoiceDate" in chunk.columns and last_max_dt is not None:
                 dt = pd.to_datetime(chunk["InvoiceDate"], dayfirst=True, errors="coerce")
                 chunk = chunk[dt > last_max_dt]

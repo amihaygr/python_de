@@ -48,12 +48,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     run_all = sub.add_parser("run-all", help="הרצת צינור מלא (אופציונלי: קגל, ייצוא, גרפים)")
     run_all.add_argument("--dataset", default=None, help="מזהה מערך (בעלים/שם)")
-    run_all.add_argument("--filename", default=None, help="שם קובץ במערך (למשל retail_sales.csv)")
+    run_all.add_argument("--filename", default=None, help="שם קובץ במערך (למשל online_retail.csv)")
     run_all.add_argument(
         "--csv-path",
         type=Path,
         default=None,
-        help="נתיב ל־CSV (ברירת מחדל: data/raw/retail_sales.csv)",
+        help="נתיב ל־CSV (ברירת מחדל: data/raw/online_retail.csv)",
     )
     run_all.add_argument(
         "--db-path",

@@ -17,6 +17,7 @@ from retail_etl.local_time import format_utc_iso_as_israel, localize_alert_rows
 from retail_etl.meta import clear_alerts, connect as meta_connect, get_last_success, get_source_state, list_active_alerts
 from retail_etl.monitor import check_for_update
 from retail_etl.presentation import APP_STYLE, project_root_from_app, render_architecture_presentation
+from retail_etl.sql_loader import load_sql
 from retail_etl.settings import DEFAULT_RETAIL_KAGGLE_DATASET, DEFAULT_RETAIL_KAGGLE_FILENAME, Settings
 from retail_etl.utils import configure_logging
 
@@ -60,17 +61,7 @@ def get_connection(db_path: Path) -> sqlite3.Connection:
 @st.cache_data(ttl=60)
 def load_dataset_overview(db_path: Path) -> dict:
     with get_connection(db_path) as conn:
-        row = conn.execute(
-            """
-            SELECT
-                COUNT(*) AS rows_count,
-                COUNT(DISTINCT CustomerID) AS customers,
-                COUNT(DISTINCT Country) AS countries,
-                MIN(InvoiceDate) AS min_date,
-                MAX(InvoiceDate) AS max_date
-            FROM stg_sales_clean
-            """
-        ).fetchone()
+        row = conn.execute(load_sql("app_dataset_overview.sql")).fetchone()
     return {
         "rows_count": int(row[0]),
         "customers": int(row[1]),
@@ -83,15 +74,7 @@ def load_dataset_overview(db_path: Path) -> dict:
 @st.cache_data(ttl=60)
 def load_staging_for_slicers(db_path: Path) -> pd.DataFrame:
     with get_connection(db_path) as conn:
-        df = pd.read_sql_query(
-            """
-            SELECT
-                InvoiceNo, StockCode, Description, Quantity, InvoiceDate,
-                UnitPrice, CustomerID, Country, line_total
-            FROM stg_sales_clean
-            """,
-            conn,
-        )
+        df = pd.read_sql_query(load_sql("app_staging_for_slicers.sql"), conn)
     df["InvoiceDate"] = pd.to_datetime(df["InvoiceDate"], errors="coerce")
     df["line_total"] = pd.to_numeric(df["line_total"], errors="coerce").fillna(0.0)
     df["Quantity"] = pd.to_numeric(df["Quantity"], errors="coerce").fillna(0.0)
@@ -99,6 +82,44 @@ def load_staging_for_slicers(db_path: Path) -> pd.DataFrame:
     df["Country"] = df["Country"].fillna("").astype(str).str.strip()
     df["Description"] = df["Description"].fillna("").astype(str).str.strip()
     return df[df["InvoiceDate"].notna()].copy()
+
+
+def compute_rfm_from_frame(df: pd.DataFrame, q: int = 5) -> pd.DataFrame:
+    required = ["CustomerID", "InvoiceNo", "InvoiceDate", "line_total"]
+    if not set(required).issubset(df.columns):
+        return pd.DataFrame()
+    work = df[required].copy()
+    work["InvoiceDate"] = pd.to_datetime(work["InvoiceDate"], errors="coerce")
+    work["line_total"] = pd.to_numeric(work["line_total"], errors="coerce").fillna(0.0)
+    work["CustomerID"] = pd.to_numeric(work["CustomerID"], errors="coerce")
+    work = work.dropna(subset=["InvoiceDate", "CustomerID"])
+    if work.empty:
+        return pd.DataFrame()
+
+    max_dt = work["InvoiceDate"].max()
+    agg = (
+        work.groupby("CustomerID", as_index=False)
+        .agg(last_invoice=("InvoiceDate", "max"), frequency=("InvoiceNo", "nunique"), monetary=("line_total", "sum"))
+    )
+    agg["recency_days"] = (max_dt - agg["last_invoice"]).dt.total_seconds() / 86400.0
+
+    def _qcut_codes(values: pd.Series) -> tuple[int, pd.Series]:
+        try:
+            codes = pd.qcut(values, q=q, labels=False, duplicates="drop")
+        except ValueError:
+            codes = pd.Series([0] * len(values), index=values.index, dtype="int64")
+        codes = codes.fillna(0).astype(int)
+        n_bins = int(codes.max()) + 1 if len(codes) else 1
+        return max(n_bins, 1), codes
+
+    r_bins, r_codes = _qcut_codes(agg["recency_days"].fillna(0))
+    f_bins, f_codes = _qcut_codes(agg["frequency"].fillna(0))
+    m_bins, m_codes = _qcut_codes(agg["monetary"].fillna(0.0))
+    agg["r_score"] = (r_bins - r_codes).clip(lower=1).astype(int)
+    agg["f_score"] = (f_codes + 1).astype(int)
+    agg["m_score"] = (m_codes + 1).astype(int)
+    agg["rfm_segment"] = agg["r_score"].astype(str) + agg["f_score"].astype(str) + agg["m_score"].astype(str)
+    return agg
 
 
 def main() -> None:
@@ -275,10 +296,6 @@ def main() -> None:
     }
 
     analytics = RetailAnalytics(db_path)
-
-    @st.cache_data(ttl=3600)
-    def get_rfm_df() -> pd.DataFrame:
-        return analytics.get_rfm(q=5)
 
     (
         tab_intro,
@@ -545,9 +562,53 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
             "**R**ecency (days since last purchase), **F**requency (invoice count), **M**onetary (cumulative revenue)."
         )
 
-        rfm_df = get_rfm_df()
+        rfm_df = compute_rfm_from_frame(filtered_df, q=5)
         if rfm_df.empty:
             st.warning("No RFM rows available (check staging dates).")
+            return
+
+        c_r1, c_r2, c_r3 = st.columns(3)
+        max_recency = float(max(rfm_df["recency_days"].max(), 1.0))
+        recency_max = c_r1.slider(
+            "Max recency (days)",
+            min_value=0.0,
+            max_value=max_recency,
+            value=max_recency,
+            step=1.0,
+            key="rfm_recency_max",
+        )
+        min_frequency = c_r2.slider(
+            "Min frequency (invoices)",
+            min_value=1,
+            max_value=int(max(rfm_df["frequency"].max(), 1)),
+            value=1,
+            step=1,
+            key="rfm_freq_min",
+        )
+        min_monetary = c_r3.slider(
+            "Min monetary",
+            min_value=0.0,
+            max_value=float(max(rfm_df["monetary"].quantile(0.99), 1.0)),
+            value=0.0,
+            step=10.0,
+            key="rfm_monetary_min",
+        )
+        seg_options = sorted(rfm_df["rfm_segment"].dropna().astype(str).unique().tolist())
+        seg_selected = st.multiselect(
+            "RFM segments",
+            options=seg_options,
+            default=seg_options[: min(15, len(seg_options))] if len(seg_options) > 15 else seg_options,
+            key="rfm_segments",
+        )
+        rfm_df = rfm_df[
+            (rfm_df["recency_days"] <= recency_max)
+            & (rfm_df["frequency"] >= min_frequency)
+            & (rfm_df["monetary"] >= min_monetary)
+        ].copy()
+        if seg_selected:
+            rfm_df = rfm_df[rfm_df["rfm_segment"].isin(seg_selected)]
+        if rfm_df.empty:
+            st.warning("No customers match current RFM slicers. Relax the RFM filters.")
             return
 
         seg_counts = (

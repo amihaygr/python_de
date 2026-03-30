@@ -153,3 +153,5 @@ The marts and charts cover the required analysis steps:
 - [x] Dynamic analysis in Streamlit with advanced slicers (date range, countries, min line-total, product search).
 - [x] Real-life dataset ingestion from Kaggle API.
 - [ ] Mentor discussion / presentation step (outside codebase; complete in class review).
+
+Presentation helper (Hebrew): `docs/presentation_personal_guide_he.md`.

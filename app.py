@@ -9,19 +9,37 @@ from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import sqlite3
 import streamlit as st
 
-from retail_etl.analytics import RetailAnalytics
+from retail_etl.analytics import (
+    RetailAnalytics,
+    normalize_weekday_hour_pivot_rows,
+    weekday_hour_pivot_slice_hours,
+    weekday_hour_revenue_pivot,
+)
 from retail_etl.local_time import format_utc_iso_as_israel, localize_alert_rows
 from retail_etl.meta import clear_alerts, connect as meta_connect, get_last_success, get_source_state, list_active_alerts
 from retail_etl.monitor import check_for_update
 from retail_etl.presentation import APP_STYLE, project_root_from_app, render_architecture_presentation
-from retail_etl.sql_loader import load_sql
+from retail_etl.utils import load_sql
 from retail_etl.settings import DEFAULT_RETAIL_KAGGLE_DATASET, DEFAULT_RETAIL_KAGGLE_FILENAME, Settings
 from retail_etl.utils import configure_logging
 
 _KAGGLE_PLACEHOLDER_SLUGS = frozenset({"owner/dataset-name"})
+_CHART_COLORWAY = ["#1D4ED8", "#0EA5E9", "#14B8A6", "#22C55E", "#F59E0B", "#EF4444", "#A855F7"]
+
+
+def _style_fig(fig, *, height: int = 430) -> None:
+    fig.update_layout(
+        template="plotly_white",
+        height=height,
+        colorway=_CHART_COLORWAY,
+        margin=dict(l=20, r=20, t=60, b=20),
+        hovermode="x unified",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    )
 
 
 def _default_kaggle_dataset() -> str:
@@ -452,15 +470,25 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
         col8.metric("Distinct SKUs", f"{int(filtered_kpis['products']):,}")
 
         st.subheader("Monthly revenue")
-        fig = px.line(
+        fig = px.area(
             monthly_filtered,
             x="year_month",
             y="revenue",
             title="Revenue by month",
             labels={"year_month": "Month", "revenue": "Revenue"},
         )
-        fig.update_layout(template="plotly_white", height=420)
-        st.plotly_chart(fig, use_container_width=True)
+        rolling = monthly_filtered["revenue"].rolling(window=3, min_periods=1).mean()
+        fig.add_trace(
+            go.Scatter(
+                x=monthly_filtered["year_month"],
+                y=rolling,
+                mode="lines+markers",
+                name="3-month trend",
+                line=dict(width=3, color="#1E293B"),
+            )
+        )
+        _style_fig(fig, height=430)
+        st.plotly_chart(fig, width="stretch")
         if executive:
             st.info("**Executive read:** trend and seasonality drive inventory and campaign timing—watch peaks and troughs.")
         else:
@@ -473,12 +501,102 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
             y="revenue",
             title="Revenue by weekday",
             labels={"weekday": "Weekday", "revenue": "Revenue"},
+            color="revenue",
+            color_continuous_scale="Blues",
+            text_auto=".2s",
         )
-        weekday_fig.update_layout(template="plotly_white", height=420)
-        st.plotly_chart(weekday_fig, use_container_width=True)
+        _style_fig(weekday_fig, height=420)
+        weekday_fig.update_traces(textposition="outside")
+        st.plotly_chart(weekday_fig, width="stretch")
         if not weekday_filtered.empty:
             best = weekday_filtered.sort_values("revenue", ascending=False).iloc[0]
             st.caption(f"Top weekday: **{best['weekday']}** → {best['revenue']:,.0f} revenue.")
+
+        st.subheader("Shopping rhythm: weekday × hour")
+        st.caption(
+            "Heatmap from `InvoiceDate`: **absolute revenue** or **% of that weekday** (shape of the day). "
+            "Optional **business-hours** slice focuses the x-axis. Same global slicers apply."
+        )
+        hcol1, hcol2 = st.columns(2)
+        with hcol1:
+            hm_view = st.radio(
+                "Heatmap metric",
+                options=["Absolute revenue", "Share of weekday (%)"],
+                horizontal=True,
+                key="heatmap_metric",
+                help="Percent mode normalizes each weekday row to 100% so you can compare intra-day shape.",
+            )
+        with hcol2:
+            hm_business = st.checkbox(
+                "Business hours only",
+                value=False,
+                key="heatmap_business_hours",
+                help="Restrict the chart to a start/end hour (inclusive).",
+            )
+        hour_lo, hour_hi = 8, 18
+        if hm_business:
+            bh1, bh2 = st.columns(2)
+            with bh1:
+                hour_lo = st.slider("From hour", 0, 23, 8, key="heatmap_hour_from")
+            with bh2:
+                hour_hi = st.slider("To hour", 0, 23, 18, key="heatmap_hour_to")
+
+        wh_pivot = weekday_hour_revenue_pivot(filtered_df)
+        if wh_pivot.empty:
+            st.warning("Not enough timed invoice rows for a weekday×hour heatmap.")
+        else:
+            display_pivot = wh_pivot
+            if hm_business:
+                display_pivot = weekday_hour_pivot_slice_hours(display_pivot, hour_lo, hour_hi)
+            if display_pivot.empty or display_pivot.shape[1] == 0:
+                st.warning("No hours in the selected window; widen the range.")
+            else:
+                hover_tmpl = "%{y} · %{x}<br>Revenue %{z:,.0f}<extra></extra>"
+                cbar_title = "Revenue"
+                title_suffix = ""
+                if hm_view == "Share of weekday (%)":
+                    # Normalize on full 0–23 row; optional hour slice shows same % of whole weekday
+                    z_df = normalize_weekday_hour_pivot_rows(wh_pivot)
+                    if hm_business:
+                        z_df = weekday_hour_pivot_slice_hours(z_df, hour_lo, hour_hi)
+                    z_matrix = z_df.values
+                    x_labels = [f"{int(h):02d}:00" for h in z_df.columns]
+                    y_labels = list(z_df.index)
+                    hover_tmpl = "%{y} · %{x}<br>%{z:.1f}% of weekday<extra></extra>"
+                    cbar_title = "% of weekday"
+                    title_suffix = " — % of weekday"
+                else:
+                    z_matrix = display_pivot.values
+                    x_labels = [f"{int(h):02d}:00" for h in display_pivot.columns]
+                    y_labels = list(display_pivot.index)
+                hm_fig = go.Figure(
+                    data=go.Heatmap(
+                        z=z_matrix,
+                        x=x_labels,
+                        y=y_labels,
+                        colorscale="YlOrRd",
+                        hovertemplate=hover_tmpl,
+                        colorbar=dict(title=cbar_title),
+                    )
+                )
+                hm_fig.update_layout(
+                    title=f"Shopping rhythm{title_suffix}",
+                    xaxis=dict(title="Hour of day", tickangle=-45),
+                    yaxis=dict(title="Weekday", autorange="reversed"),
+                    hovermode="closest",
+                )
+                _style_fig(hm_fig, height=440)
+                st.plotly_chart(hm_fig, width="stretch")
+            if executive:
+                st.info(
+                    "**Pulse:** brighter = more demand in that slot—use **%** mode to compare *shape* across "
+                    "weekdays even when totals differ."
+                )
+            else:
+                st.caption(
+                    "If hours look uniformly flat, the source CSV may truncate times to midnight; "
+                    "otherwise peaks highlight intra-day shopping rhythm."
+                )
 
         st.subheader("Invoice size distribution")
         hist_fig = px.histogram(
@@ -487,9 +605,11 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
             nbins=40,
             title="Revenue per invoice",
             labels={"invoice_revenue": "Invoice revenue"},
+            color_discrete_sequence=["#1D4ED8"],
+            marginal="box",
         )
-        hist_fig.update_layout(template="plotly_white", height=420)
-        st.plotly_chart(hist_fig, use_container_width=True)
+        _style_fig(hist_fig, height=420)
+        st.plotly_chart(hist_fig, width="stretch")
         if not invoice_totals.empty:
             q50 = float(invoice_totals["invoice_revenue"].quantile(0.5))
             q90 = float(invoice_totals["invoice_revenue"].quantile(0.9))
@@ -502,13 +622,18 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
         top_products = products_filtered.head(top_n)
         fig = px.bar(
             top_products,
-            x="Description",
-            y="revenue",
+            x="revenue",
+            y="Description",
             title=f"Top {top_n} products",
             labels={"Description": "Product", "revenue": "Revenue"},
+            orientation="h",
+            color="revenue",
+            color_continuous_scale="Tealgrn",
+            text_auto=".2s",
         )
-        fig.update_layout(template="plotly_white", xaxis_tickangle=-45, height=500)
-        st.plotly_chart(fig, use_container_width=True)
+        fig.update_yaxes(categoryorder="total ascending")
+        _style_fig(fig, height=520)
+        st.plotly_chart(fig, width="stretch")
         if not executive:
             st.dataframe(top_products, use_container_width=True, hide_index=True)
         if executive:
@@ -522,13 +647,18 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
         top_customers = customers_filtered.head(top_n_c)
         fig = px.bar(
             top_customers,
-            x="CustomerID",
-            y="revenue",
+            x="revenue",
+            y=top_customers["CustomerID"].astype(str),
             title=f"Top {top_n_c} customers",
             labels={"CustomerID": "Customer ID", "revenue": "Revenue"},
+            orientation="h",
+            color="revenue",
+            color_continuous_scale="Purples",
+            text_auto=".2s",
         )
-        fig.update_layout(template="plotly_white", height=450)
-        st.plotly_chart(fig, use_container_width=True)
+        fig.update_yaxes(title="Customer ID", categoryorder="total ascending")
+        _style_fig(fig, height=500)
+        st.plotly_chart(fig, width="stretch")
         if not executive:
             st.dataframe(top_customers, use_container_width=True, hide_index=True)
         if executive:
@@ -540,15 +670,16 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
         st.subheader("Top countries by revenue")
         top_n_co = st.slider("Top N", min_value=5, max_value=30, value=10, step=5, key="co")
         top_countries = countries_filtered.head(top_n_co)
-        fig = px.bar(
+        fig = px.treemap(
             top_countries,
-            x="Country",
-            y="revenue",
+            path=["Country"],
+            values="revenue",
             title=f"Top {top_n_co} countries",
-            labels={"Country": "Country", "revenue": "Revenue"},
+            color="revenue",
+            color_continuous_scale="Blues",
         )
-        fig.update_layout(template="plotly_white", xaxis_tickangle=-45, height=500)
-        st.plotly_chart(fig, use_container_width=True)
+        _style_fig(fig, height=520)
+        st.plotly_chart(fig, width="stretch")
         if not executive:
             st.dataframe(top_countries, use_container_width=True, hide_index=True)
         if executive:
@@ -629,9 +760,27 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
             y="customers",
             title="Largest RFM segments (by customer count)",
             labels={"rfm_segment": "RFM segment", "customers": "Customers"},
+            color="avg_monetary",
+            color_continuous_scale="Turbo",
+            text_auto=True,
         )
-        seg_fig.update_layout(template="plotly_white", height=420, xaxis_tickangle=-45)
-        st.plotly_chart(seg_fig, use_container_width=True)
+        seg_fig.update_layout(xaxis_tickangle=-45)
+        _style_fig(seg_fig, height=440)
+        st.plotly_chart(seg_fig, width="stretch")
+
+        bubble = px.scatter(
+            rfm_df,
+            x="recency_days",
+            y="frequency",
+            size="monetary",
+            color="rfm_segment",
+            title="RFM bubble map (Recency vs Frequency, bubble size = Monetary)",
+            labels={"recency_days": "Recency (days)", "frequency": "Frequency"},
+            hover_data={"CustomerID": True, "monetary": ":.2f"},
+            size_max=35,
+        )
+        _style_fig(bubble, height=460)
+        st.plotly_chart(bubble, width="stretch")
 
         best = rfm_df.sort_values("monetary", ascending=False).head(1).iloc[0]
         st.caption(
@@ -651,6 +800,9 @@ The UI stays thin; quantitative logic lives in **`src/retail_etl/analytics.py`**
 | `get_revenue_by_weekday()` | Weekday seasonality |
 | `get_invoice_revenue_distribution()` | Invoice-level histogram input |
 | `get_rfm(q=5)` | Segmentation with quantile bins |
+| `weekday_hour_revenue_pivot(df)` | Weekday × hour revenue matrix (heatmap input) |
+| `normalize_weekday_hour_pivot_rows(pivot)` | Row-wise % of weekday (for shape comparison) |
+| `weekday_hour_pivot_slice_hours(pivot, lo, hi)` | Hour column slice (business window) |
 """
             )
             st.divider()
@@ -696,7 +848,7 @@ For engineering depth, switch sidebar mode to **Technical** or open the **Archit
 `EXPECTED_RAW_COLUMNS`; alerts in `meta_*` tables.
 
 **3. SQL hygiene** — Dynamic reads use **allowlisted** table names (`db_security.py`). Query text lives under
-`src/retail_etl/sql/*.sql` and is loaded via `sql_loader.py`.
+`src/retail_etl/sql/*.sql` and is loaded via `utils.load_sql`.
 
 **4. Quality gates** — `tests/` with `pytest`; `Dockerfile` for repeatable runs on port **8501**.
 

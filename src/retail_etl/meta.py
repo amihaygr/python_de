@@ -9,8 +9,8 @@ from typing import Any, Optional
 
 import sqlite3
 
-from .paths import get_paths
-from .sql_loader import load_sql
+from .settings import get_paths
+from .utils import load_sql
 
 
 def utc_now_iso() -> str:

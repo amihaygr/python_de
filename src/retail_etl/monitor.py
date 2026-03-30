@@ -25,7 +25,7 @@ from .meta import (
     upsert_schema_state,
     upsert_source_state,
 )
-from .paths import get_paths
+from .settings import get_paths
 
 logger = get_logger(__name__)
 

@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .utils import get_logger
-from .paths import get_paths
+from .settings import get_paths
 
 logger = get_logger(__name__)
 

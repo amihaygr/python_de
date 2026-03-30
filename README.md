@@ -268,6 +268,7 @@ Show:
 - Headline metrics.
 - Monthly trend.
 - Weekday revenue.
+- **Shopping rhythm heatmap** (weekday × hour; absolute revenue, optional **% of weekday** per row, optional **business-hours** window).
 - Invoice distribution.
 
 Say:
@@ -329,3 +330,20 @@ Say:
 - CLI enables operational repeatability outside the UI.
 - Docker provides consistent runtime and quick redeploy.
 - Tests (`pytest`) protect key cleaning/security behavior.
+
+---
+
+## 15) Human engineering notes (what we learned)
+
+This project intentionally keeps a practical, "real team" mindset:
+
+- We hit real ingestion issues (Kaggle auth, 403/404, filename mismatches) and hardened the flow.
+- We saw real incremental-load edge cases (`UNIQUE` collisions) and fixed them with explicit dedupe strategy.
+- We improved dashboard trust by distinguishing:
+  - `Last successful refresh`
+  - `Last check time`
+  and recording successful `noop` checks.
+- We evolved visuals iteratively for communication:
+  from basic charts to story-first visuals (trend overlays, treemap, bubble maps, advanced slicers).
+
+The result is not just "working code", but a maintainable analytics product with operational clarity.

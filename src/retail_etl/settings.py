@@ -51,11 +51,14 @@ def get_paths() -> ProjectPaths:
 
 
 def _load_dotenv_if_available() -> None:
+    """Load `.env` from project root so Kaggle/DB vars work even when cwd is not the repo."""
     try:
         from dotenv import load_dotenv
     except ImportError:
         return
-    load_dotenv()
+    env_path = get_project_root() / ".env"
+    load_dotenv(env_path)
+    load_dotenv()  # optional: cwd `.env` if present (does not unset vars already set)
 
 
 _load_dotenv_if_available()

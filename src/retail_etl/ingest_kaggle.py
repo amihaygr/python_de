@@ -42,12 +42,17 @@ def _ensure_kaggle_auth_hint() -> None:
     if kaggle_json.exists():
         return
     home = Path.home()
+    kaggle_json_path = home / ".kaggle" / "kaggle.json"
     raise RuntimeError(
-        "Kaggle credentials not found. Set KAGGLE_USERNAME and KAGGLE_KEY (from "
-        "https://www.kaggle.com/settings → API → Create New Token), "
-        f"or place kaggle.json at {home / '.kaggle' / 'kaggle.json'}. "
-        "You can store the two variables in a project `.env` file (see `.env.example`); "
-        "Streamlit and the CLI load it on startup."
+        "Kaggle credentials not found. Do one of the following:\n"
+        "  • Set KAGGLE_USERNAME and KAGGLE_KEY (from "
+        "https://www.kaggle.com/settings → API → Create New Token).\n"
+        f"  • Or place kaggle.json at {kaggle_json_path} "
+        r"(Windows: typically %USERPROFILE%\.kaggle\kaggle.json)." "\n"
+        "  • Or put both variables in `.env` at the project root (see `.env.example`); "
+        "Streamlit/CLI load that file from the repo root on startup.\n"
+        "Docker: use `-e KAGGLE_USERNAME=... -e KAGGLE_KEY=...` or mount "
+        r"`%USERPROFILE%\.kaggle` → `/root/.kaggle` (Windows) or `~/.kaggle` → `/root/.kaggle` (macOS/Linux), read-only."
     )
 
 

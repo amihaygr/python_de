@@ -186,7 +186,6 @@ def main() -> None:
             "Mode",
             options=["Executive", "Technical"],
             index=0,
-            horizontal=True,
             help=(
                 "**Executive:** outcomes-first copy, lean technical detail. "
                 "**Technical:** expanded implementation notes and source code where relevant."

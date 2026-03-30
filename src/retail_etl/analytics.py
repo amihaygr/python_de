@@ -9,10 +9,30 @@ from typing import Any
 import pandas as pd
 import sqlite3
 
-from .sql_loader import load_sql
-from .utils import get_logger
+from .utils import get_logger, load_sql
 
 logger = get_logger(__name__)
+
+
+def weekday_hour_revenue_pivot(df: pd.DataFrame) -> pd.DataFrame:
+    """Rows: weekday (Sun..Sat), columns: hour 0–23, values: sum of line revenue."""
+    if df.empty or not {"InvoiceDate", "line_total"}.issubset(df.columns):
+        return pd.DataFrame()
+    work = df[["InvoiceDate", "line_total"]].copy()
+    work["line_total"] = pd.to_numeric(work["line_total"], errors="coerce").fillna(0.0)
+    work["hour"] = work["InvoiceDate"].dt.hour
+    work["weekday_short"] = work["InvoiceDate"].dt.day_name().str.slice(0, 3)
+    g = work.groupby(["weekday_short", "hour"], as_index=False).agg(revenue=("line_total", "sum"))
+    if g.empty:
+        return pd.DataFrame()
+    pivot = g.pivot(index="weekday_short", columns="hour", values="revenue").fillna(0.0)
+    weekday_order = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    pivot = pivot.reindex([w for w in weekday_order if w in pivot.index])
+    for h in range(24):
+        if h not in pivot.columns:
+            pivot[h] = 0.0
+    pivot = pivot[sorted(pivot.columns)]
+    return pivot
 
 
 def _connect(db_path: Path) -> sqlite3.Connection:

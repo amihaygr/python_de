@@ -268,6 +268,7 @@ Show:
 - Headline metrics.
 - Monthly trend.
 - Weekday revenue.
+- **Shopping rhythm heatmap** (weekday × hour of day; revenue per cell).
 - Invoice distribution.
 
 Say:

@@ -13,7 +13,7 @@ import plotly.graph_objects as go
 import sqlite3
 import streamlit as st
 
-from retail_etl.analytics import RetailAnalytics
+from retail_etl.analytics import RetailAnalytics, weekday_hour_revenue_pivot
 from retail_etl.local_time import format_utc_iso_as_israel, localize_alert_rows
 from retail_etl.meta import clear_alerts, connect as meta_connect, get_last_success, get_source_state, list_active_alerts
 from retail_etl.monitor import check_for_update
@@ -506,6 +506,43 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
         if not weekday_filtered.empty:
             best = weekday_filtered.sort_values("revenue", ascending=False).iloc[0]
             st.caption(f"Top weekday: **{best['weekday']}** → {best['revenue']:,.0f} revenue.")
+
+        st.subheader("Shopping rhythm: weekday × hour")
+        st.caption(
+            "Heatmap of **revenue** by calendar weekday and clock hour from `InvoiceDate` "
+            "(same slicers as above). Brighter cells = more sales in that hour."
+        )
+        wh_pivot = weekday_hour_revenue_pivot(filtered_df)
+        if wh_pivot.empty:
+            st.warning("Not enough timed invoice rows for a weekday×hour heatmap.")
+        else:
+            hm_fig = go.Figure(
+                data=go.Heatmap(
+                    z=wh_pivot.values,
+                    x=[f"{int(h):02d}:00" for h in wh_pivot.columns],
+                    y=list(wh_pivot.index),
+                    colorscale="YlOrRd",
+                    hovertemplate="%{y} · %{x}<br>Revenue %{z:,.0f}<extra></extra>",
+                    colorbar=dict(title="Revenue"),
+                )
+            )
+            hm_fig.update_layout(
+                xaxis=dict(title="Hour of day", tickangle=-45),
+                yaxis=dict(title="Weekday", autorange="reversed"),
+                hovermode="closest",
+            )
+            _style_fig(hm_fig, height=440)
+            st.plotly_chart(hm_fig, width="stretch")
+            if executive:
+                st.info(
+                    "**Pulse:** this shows *when* demand clusters across the week—useful for staffing, "
+                    "send-time, and campaign windows."
+                )
+            else:
+                st.caption(
+                    "If hours look uniformly flat, the source CSV may truncate times to midnight; "
+                    "otherwise peaks highlight intra-day shopping rhythm."
+                )
 
         st.subheader("Invoice size distribution")
         hist_fig = px.histogram(

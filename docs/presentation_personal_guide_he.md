@@ -37,7 +37,7 @@
 
 ### 5) Architecture
 - "הארכיטקטורה מפרידה אחריות: ingestion/monitor/etl/analytics/export/plotting."
-- "SQL חי בקבצי `src/retail_etl/sql/*.sql`, וה-Python טוען אותם דרך `sql_loader.py`."
+- "SQL חי בקבצי `src/retail_etl/sql/*.sql`, וה-Python טוען אותם דרך `utils.load_sql`."
 - "הפרדה זו מקלה על סקירה, בדיקות, ושינויים עתידיים."
 
 ### 6) Project summary

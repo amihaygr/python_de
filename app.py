@@ -18,7 +18,7 @@ from retail_etl.local_time import format_utc_iso_as_israel, localize_alert_rows
 from retail_etl.meta import clear_alerts, connect as meta_connect, get_last_success, get_source_state, list_active_alerts
 from retail_etl.monitor import check_for_update
 from retail_etl.presentation import APP_STYLE, project_root_from_app, render_architecture_presentation
-from retail_etl.sql_loader import load_sql
+from retail_etl.utils import load_sql
 from retail_etl.settings import DEFAULT_RETAIL_KAGGLE_DATASET, DEFAULT_RETAIL_KAGGLE_FILENAME, Settings
 from retail_etl.utils import configure_logging
 
@@ -754,7 +754,7 @@ For engineering depth, switch sidebar mode to **Technical** or open the **Archit
 `EXPECTED_RAW_COLUMNS`; alerts in `meta_*` tables.
 
 **3. SQL hygiene** — Dynamic reads use **allowlisted** table names (`db_security.py`). Query text lives under
-`src/retail_etl/sql/*.sql` and is loaded via `sql_loader.py`.
+`src/retail_etl/sql/*.sql` and is loaded via `utils.load_sql`.
 
 **4. Quality gates** — `tests/` with `pytest`; `Dockerfile` for repeatable runs on port **8501**.
 

@@ -6,12 +6,48 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from .paths import ProjectPaths, get_paths
-
 # Public Online Retail CSV on Kaggle (UCI-style columns). File must match dataset contents.
 # Note: bekkarmerwan/... only ships an .xlsx, so API download of "retail_sales.csv" returns 404.
 DEFAULT_RETAIL_KAGGLE_DATASET = "dp1224/online-retail-csv"
 DEFAULT_RETAIL_KAGGLE_FILENAME = "online_retail.csv"
+
+
+@dataclass(frozen=True)
+class ProjectPaths:
+    root: Path
+
+    @property
+    def data_dir(self) -> Path:
+        return self.root / "data"
+
+    @property
+    def raw_dir(self) -> Path:
+        return self.data_dir / "raw"
+
+    @property
+    def db_dir(self) -> Path:
+        return self.data_dir / "db"
+
+    @property
+    def exports_dir(self) -> Path:
+        return self.data_dir / "exports"
+
+    @property
+    def reports_dir(self) -> Path:
+        return self.root / "reports"
+
+    @property
+    def charts_dir(self) -> Path:
+        return self.reports_dir / "charts"
+
+
+def get_project_root() -> Path:
+    # this file is in src/retail_etl/settings.py -> project root is parents[2]
+    return Path(__file__).resolve().parents[2]
+
+
+def get_paths() -> ProjectPaths:
+    return ProjectPaths(root=get_project_root())
 
 
 def _load_dotenv_if_available() -> None:

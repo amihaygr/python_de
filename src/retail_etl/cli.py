@@ -10,7 +10,7 @@ from pathlib import Path
 from .etl import run_etl
 from .exporter import export_tables
 from .utils import configure_logging, get_logger
-from .paths import get_paths
+from .settings import get_paths
 from .plotting import generate_charts
 from .settings import Settings
 

@@ -103,25 +103,19 @@ Use expanders to control depth: **high-level for leadership**, **full detail for
         pkg_files: list[tuple[str, str, str]] = [
             ("__init__.py", "Package marker.", "Standard Python package; enables `import retail_etl`."),
             (
-                "paths.py",
-                "Canonical paths.",
-                "`ProjectPaths` / `get_paths()`: `data/raw`, `data/db`, `reports`, etc.",
+                "settings.py",
+                "Environment + path config.",
+                "`ProjectPaths`, `get_paths()`, and `Settings.load()`: data/db/reports paths, DB path, defaults, log level.",
             ),
             (
-                "settings.py",
-                "Environment-driven config.",
-                "`Settings.load()`: DB path, default CSV, log level, Kaggle defaults.",
+                "utils.py",
+                "Shared helpers.",
+                "`configure_logging`, `get_logger`, `load_sql` (cached SQL loader) for runtime modules.",
             ),
-            ("utils.py", "Logging helpers.", "`configure_logging`, `get_logger` for CLI and library."),
             (
                 "db_security.py",
                 "Table allowlists.",
                 "`EXPECTED_RAW_COLUMNS`, `assert_read_table`, `assert_export_table` — guard dynamic SQL.",
-            ),
-            (
-                "sql_loader.py",
-                "Load `.sql` files.",
-                "`load_sql(name)` reads from `sql/` with LRU cache.",
             ),
             (
                 "etl.py",
@@ -162,7 +156,7 @@ Use expanders to control depth: **high-level for leadership**, **full detail for
                 st.markdown(f"**Summary:** {short}\n\n**Detail:** {long}")
 
     with st.expander("Folder: `src/retail_etl/sql/`", expanded=False):
-        st.markdown("Each file is raw SQL; Python loads it at runtime via `sql_loader.load_sql`.")
+        st.markdown("Each file is raw SQL; Python loads it at runtime via `utils.load_sql`.")
         sql_index: list[tuple[str, str]] = [
             ("marts_monthly.sql", "Monthly aggregates → revenue trend."),
             ("marts_product.sql", "Revenue by product (code + description)."),

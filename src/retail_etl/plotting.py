@@ -8,7 +8,7 @@ import plotly.express as px
 import sqlite3
 import pandas as pd
 
-from .paths import get_paths
+from .settings import get_paths
 from .db_security import assert_export_table
 
 

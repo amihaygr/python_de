@@ -9,9 +9,9 @@ from typing import Optional
 import pandas as pd
 import sqlite3
 
-from .paths import get_paths
+from .settings import get_paths
 from .settings import DEFAULT_RETAIL_KAGGLE_FILENAME
-from .sql_loader import load_sql
+from .utils import load_sql
 
 import logging
 

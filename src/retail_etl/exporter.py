@@ -8,7 +8,7 @@ from typing import Iterable
 import pandas as pd
 import sqlite3
 
-from .paths import get_paths
+from .settings import get_paths
 from .db_security import assert_export_table
 
 

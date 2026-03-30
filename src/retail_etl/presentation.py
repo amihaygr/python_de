@@ -30,6 +30,21 @@ APP_STYLE = """
         border-right: 1px solid var(--retail-border);
     }
     section[data-testid="stSidebar"] .block-container { padding-top: 1.25rem; }
+    /* Date inputs: smaller type so range picker fits the sidebar */
+    section[data-testid="stSidebar"] [data-testid="stDateInput"] label {
+        font-size: 0.76rem !important;
+        line-height: 1.2 !important;
+    }
+    section[data-testid="stSidebar"] [data-testid="stDateInput"] [data-baseweb="input"],
+    section[data-testid="stSidebar"] [data-testid="stDateInput"] input {
+        font-size: 0.76rem !important;
+        min-height: 30px !important;
+        padding-top: 0.2rem !important;
+        padding-bottom: 0.2rem !important;
+    }
+    section[data-testid="stSidebar"] [data-testid="stDateInput"] p {
+        font-size: 0.76rem !important;
+    }
     .sidebar-section-label {
         font-size: 0.7rem;
         font-weight: 700;

@@ -19,7 +19,7 @@ from retail_etl.analytics import (
     weekday_hour_pivot_slice_hours,
     weekday_hour_revenue_pivot,
 )
-from retail_etl.local_time import format_utc_iso_as_israel, localize_alert_rows
+from retail_etl.local_time import format_utc_iso_as_israel_compact, localize_alert_rows
 from retail_etl.meta import clear_alerts, connect as meta_connect, get_last_success, get_source_state, list_active_alerts
 from retail_etl.monitor import check_for_update
 from retail_etl.presentation import (
@@ -84,6 +84,21 @@ def _default_kaggle_filename() -> str:
 
 def get_connection(db_path: Path) -> sqlite3.Connection:
     return sqlite3.connect(db_path, timeout=30.0)
+
+
+def _compact_date_only(val: object) -> str:
+    """Show YYYY-MM-DD only for staging/metric strings (drops time part when present)."""
+    if val is None:
+        return "—"
+    ts = pd.to_datetime(val, errors="coerce")
+    if pd.isna(ts):
+        s = str(val).strip()
+        return s[:10] if len(s) >= 10 else s
+    return ts.strftime("%Y-%m-%d")
+
+
+def _compact_date_range_label(a: object, b: object) -> str:
+    return f"{_compact_date_only(a)} → {_compact_date_only(b)}"
 
 
 @st.cache_data(ttl=60)
@@ -251,6 +266,8 @@ def main() -> None:
             value=(min_dt, max_dt),
             min_value=min_dt,
             max_value=max_dt,
+            format="YYYY-MM-DD",
+            width="content",
         )
         if isinstance(date_range, tuple) and len(date_range) == 2:
             from_date, to_date = date_range
@@ -405,7 +422,7 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
         c1.metric("Clean rows (staging)", f"{info['rows_count']:,}")
         c2.metric("Distinct customers", f"{info['customers']:,}")
         c3.metric("Countries", f"{info['countries']:,}")
-        c4.metric("Date range", f"{info['min_date']} → {info['max_date']}")
+        c4.metric("Date range", _compact_date_range_label(info["min_date"], info["max_date"]))
         st.caption(
             "Full-database snapshot after ETL (not the filtered slice). Use sidebar filters to narrow charts."
         )
@@ -419,8 +436,8 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
         m1, m2, m3 = st.columns(3)
         m1.metric(
             "Last successful refresh",
-            format_utc_iso_as_israel(last_success["finished_at"]) if last_success else "—",
-            help="Stored in UTC; shown in Asia/Jerusalem (IST/IDT).",
+            format_utc_iso_as_israel_compact(last_success["finished_at"]) if last_success else "—",
+            help="Pipeline finish time: UTC in DB, shown as Asia/Jerusalem local (compact).",
         )
         m2.metric("Last run mode", last_success["mode"] if last_success else "—")
         m3.metric("Active alerts", str(len(alerts)))
@@ -432,7 +449,7 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
             sha = source_state.get("sha256") or "—"
             st.caption(
                 f"Source fingerprint: `{sha[:16]}…` · {source_state.get('size_bytes')} bytes · "
-                f"last check time (Israel): **{format_utc_iso_as_israel(source_state.get('updated_at'))}**"
+                f"last check (IL): **{format_utc_iso_as_israel_compact(source_state.get('updated_at'))}**"
             )
 
         if alerts:

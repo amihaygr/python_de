@@ -34,6 +34,15 @@ def format_utc_iso_as_israel(value: Optional[str], *, pattern: str = "%d/%m/%Y %
     return f"{local.strftime(pattern)} {tz}".strip()
 
 
+def format_utc_iso_as_israel_compact(value: Optional[str]) -> str:
+    """Short dashboard string: local Israel date + time, no timezone suffix (saves metric width)."""
+    dt = parse_utc_iso(value)
+    if dt is None:
+        return "—"
+    local = dt.astimezone(_IL)
+    return local.strftime("%Y-%m-%d %H:%M")
+
+
 def localize_alert_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Replace created_at ISO strings with Israel-formatted strings for UI tables."""
     out: list[dict[str, Any]] = []

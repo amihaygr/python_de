@@ -29,9 +29,8 @@ from retail_etl.presentation import (
     render_presenter_hint,
     render_pipeline_sankey,
 )
-from retail_etl.utils import load_sql
 from retail_etl.settings import DEFAULT_RETAIL_KAGGLE_DATASET, DEFAULT_RETAIL_KAGGLE_FILENAME, Settings
-from retail_etl.utils import configure_logging
+from retail_etl.utils import configure_logging, load_sql_section
 
 _KAGGLE_PLACEHOLDER_SLUGS = frozenset({"owner/dataset-name"})
 _CHART_COLORWAY = ["#1D4ED8", "#0EA5E9", "#14B8A6", "#22C55E", "#F59E0B", "#EF4444", "#A855F7"]
@@ -85,7 +84,7 @@ def get_connection(db_path: Path) -> sqlite3.Connection:
 @st.cache_data(ttl=60)
 def load_dataset_overview(db_path: Path) -> dict:
     with get_connection(db_path) as conn:
-        row = conn.execute(load_sql("app_dataset_overview.sql")).fetchone()
+        row = conn.execute(load_sql_section("app.sql", "dataset_overview")).fetchone()
     return {
         "rows_count": int(row[0]),
         "customers": int(row[1]),
@@ -98,7 +97,7 @@ def load_dataset_overview(db_path: Path) -> dict:
 @st.cache_data(ttl=60)
 def load_staging_for_slicers(db_path: Path) -> pd.DataFrame:
     with get_connection(db_path) as conn:
-        df = pd.read_sql_query(load_sql("app_staging_for_slicers.sql"), conn)
+        df = pd.read_sql_query(load_sql_section("app.sql", "staging_for_slicers"), conn)
     df["InvoiceDate"] = pd.to_datetime(df["InvoiceDate"], errors="coerce")
     df["line_total"] = pd.to_numeric(df["line_total"], errors="coerce").fillna(0.0)
     df["Quantity"] = pd.to_numeric(df["Quantity"], errors="coerce").fillna(0.0)
@@ -872,7 +871,7 @@ For engineering depth, switch sidebar mode to **Technical** or open the **Archit
 `EXPECTED_RAW_COLUMNS`; alerts in `meta_*` tables.
 
 **3. SQL hygiene** — Dynamic reads use **allowlisted** table names (`db_security.py`). Query text lives under
-`src/retail_etl/sql/*.sql` and is loaded via `utils.load_sql`.
+`src/retail_etl/sql/*.sql` bundles and is loaded via `utils.load_sql_section`.
 
 **4. Quality gates** — `tests/` with `pytest`; `Dockerfile` for repeatable runs on port **8501**.
 

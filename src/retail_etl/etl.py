@@ -11,7 +11,7 @@ import sqlite3
 
 from .settings import get_paths
 from .settings import DEFAULT_RETAIL_KAGGLE_FILENAME
-from .utils import load_sql
+from .utils import load_sql_section
 
 import logging
 
@@ -101,27 +101,27 @@ def _dedupe_staging_table(conn: sqlite3.Connection) -> None:
 
 
 def _init_staging(conn: sqlite3.Connection, *, use_unique_index: bool = False) -> None:
-    conn.executescript(load_sql("etl_init_staging.sql"))
+    conn.executescript(load_sql_section("etl.sql", "init_staging"))
     if use_unique_index:
         _dedupe_staging_table(conn)
-        conn.executescript(load_sql("etl_create_unique_index.sql"))
+        conn.executescript(load_sql_section("etl.sql", "create_unique_index"))
 
 
 def rebuild_marts(conn: sqlite3.Connection) -> None:
     """מחשב מחדש את כל טבלאות ה־mart מתוך staging."""
-    query_monthly = load_sql("marts_monthly.sql")
+    query_monthly = load_sql_section("marts.sql", "monthly")
     monthly = pd.read_sql_query(query_monthly, conn)
     monthly.to_sql("mart_sales_monthly", conn, if_exists="replace", index=False)
 
-    query_product = load_sql("marts_product.sql")
+    query_product = load_sql_section("marts.sql", "product")
     product = pd.read_sql_query(query_product, conn)
     product.to_sql("mart_product_summary", conn, if_exists="replace", index=False)
 
-    query_country = load_sql("marts_country.sql")
+    query_country = load_sql_section("marts.sql", "country")
     country = pd.read_sql_query(query_country, conn)
     country.to_sql("mart_country_summary", conn, if_exists="replace", index=False)
 
-    query_customer = load_sql("marts_customer.sql")
+    query_customer = load_sql_section("marts.sql", "customer")
     customer = pd.read_sql_query(query_customer, conn)
     customer.to_sql("mart_customer_summary", conn, if_exists="replace", index=False)
 
@@ -136,7 +136,7 @@ def write_sqlite(clean_df: pd.DataFrame, db_path: Optional[Path] = None) -> Path
     conn = sqlite3.connect(db_path)
     try:
         conn.execute("BEGIN IMMEDIATE")
-        conn.executescript(load_sql("etl_drop_staging.sql"))
+        conn.executescript(load_sql_section("etl.sql", "drop_staging"))
         _init_staging(conn, use_unique_index=False)
         clean_df.to_sql("stg_sales_clean", conn, if_exists="append", index=False)
         rebuild_marts(conn)
@@ -170,7 +170,7 @@ def _insert_incremental(conn: sqlite3.Connection, df: pd.DataFrame) -> int:
         "Country",
         "line_total",
     ]
-    sql = load_sql("etl_insert_incremental.sql")
+    sql = load_sql_section("etl.sql", "insert_incremental")
     before = conn.total_changes
     conn.executemany(sql, df[cols].itertuples(index=False, name=None))
     after = conn.total_changes
@@ -208,7 +208,7 @@ def run_etl(
     try:
         conn.execute("BEGIN IMMEDIATE")
         _init_staging(conn, use_unique_index=True)
-        row = conn.execute(load_sql("etl_select_max_invoice_date.sql")).fetchone()
+        row = conn.execute(load_sql_section("etl.sql", "select_max_invoice_date")).fetchone()
         last_max = row[0]
         last_max_dt = pd.to_datetime(last_max) if last_max else None
 

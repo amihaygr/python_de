@@ -285,7 +285,7 @@ Use expanders to control depth: **high-level for leadership**, **full detail for
             (
                 "utils.py",
                 "Shared helpers.",
-                "`configure_logging`, `get_logger`, `load_sql` (cached SQL loader) for runtime modules.",
+                "`configure_logging`, `get_logger`, `load_sql_section` (cached bundle loader) for runtime modules.",
             ),
             (
                 "db_security.py",
@@ -300,7 +300,7 @@ Use expanders to control depth: **high-level for leadership**, **full detail for
             (
                 "meta.py",
                 "SQLite metadata tables.",
-                "Source state, schema snapshot, pipeline runs, alerts via `meta_*.sql`.",
+                "Source state, schema snapshot, pipeline runs, alerts via `meta.sql` sections.",
             ),
             (
                 "ingest_kaggle.py",
@@ -331,36 +331,31 @@ Use expanders to control depth: **high-level for leadership**, **full detail for
                 st.markdown(f"**Summary:** {short}\n\n**Detail:** {long}")
 
     with st.expander("Folder: `src/retail_etl/sql/`", expanded=False):
-        st.markdown("Each file is raw SQL; Python loads it at runtime via `utils.load_sql`.")
-        sql_index: list[tuple[str, str]] = [
-            ("marts_monthly.sql", "Monthly aggregates → revenue trend."),
-            ("marts_product.sql", "Revenue by product (code + description)."),
-            ("marts_country.sql", "Revenue by country."),
-            ("marts_customer.sql", "Revenue by customer."),
-            ("analytics_kpis.sql", "Dashboard KPIs from staging."),
-            ("analytics_weekday.sql", "Revenue by weekday (`strftime`)."),
-            ("analytics_invoice_distribution.sql", "Revenue per invoice."),
-            ("analytics_rfm_max_date.sql", "Max invoice date for recency baseline."),
-            ("analytics_rfm_customers.sql", "Per-customer RFM base metrics."),
-            ("etl_init_staging.sql", "Create clean staging table."),
-            ("etl_create_unique_index.sql", "Unique index for incremental dedupe."),
-            ("etl_drop_staging.sql", "Drop staging / index before full reload."),
-            ("etl_insert_incremental.sql", "`INSERT OR IGNORE` for new rows."),
-            ("etl_select_max_invoice_date.sql", "Watermark for incremental chunks."),
-            ("meta_init_tables.sql", "Create all meta tables."),
-            ("meta_upsert_source_state.sql", "Upsert source fingerprint."),
-            ("meta_get_source_state.sql", "Read source state."),
-            ("meta_add_alert.sql", "Insert alert."),
-            ("meta_clear_alerts_all.sql", "Deactivate all alerts."),
-            ("meta_clear_alerts_by_kind.sql", "Deactivate by kind."),
-            ("meta_list_active_alerts.sql", "List active alerts."),
-            ("meta_start_run.sql", "Start pipeline run row."),
-            ("meta_finish_run.sql", "Finish run with status / error."),
-            ("meta_upsert_schema_state.sql", "Persist column/dtype snapshot."),
-            ("meta_get_last_success.sql", "Last successful run."),
+        st.markdown(
+            "Five bundled `.sql` files group related statements. Sections are marked with "
+            "`-- @section name` … `-- @end`; Python loads them via `utils.load_sql_section(bundle, section)`."
+        )
+        sql_bundles: list[tuple[str, str]] = [
+            (
+                "meta.sql",
+                "Metadata: `init_tables`, `upsert_source_state`, `get_source_state`, alerts, `start_run` / `finish_run`, schema snapshot, `get_last_success`.",
+            ),
+            (
+                "etl.sql",
+                "Staging lifecycle: `init_staging`, `create_unique_index`, `drop_staging`, `insert_incremental`, `select_max_invoice_date`.",
+            ),
+            (
+                "marts.sql",
+                "Mart rebuild SELECTs: `monthly`, `product`, `country`, `customer` → `mart_*` tables.",
+            ),
+            (
+                "analytics.sql",
+                "Dashboard analytics: `kpis`, `weekday`, `invoice_distribution`, `rfm_max_date`, `rfm_customers`.",
+            ),
+            ("app.sql", "Streamlit helpers: `dataset_overview`, `staging_for_slicers`."),
         ]
-        for fname, desc in sql_index:
-            with st.expander(f"SQL: `{fname}`", expanded=False):
+        for fname, desc in sql_bundles:
+            with st.expander(f"SQL bundle: `{fname}`", expanded=False):
                 st.markdown(desc)
                 sql_path = root / "src" / "retail_etl" / "sql" / fname
                 if sql_path.is_file():

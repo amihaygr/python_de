@@ -9,7 +9,7 @@ from typing import Any
 import pandas as pd
 import sqlite3
 
-from .utils import get_logger, load_sql
+from .utils import get_logger, load_sql_section
 
 logger = get_logger(__name__)
 
@@ -86,7 +86,7 @@ class RetailAnalytics:
 
     def get_kpis(self) -> dict[str, float | str]:
         """מחזיר מילון KPI מהטבלה הנקייה."""
-        sql = load_sql("analytics_kpis.sql")
+        sql = load_sql_section("analytics.sql", "kpis")
         row = self._read_sql(sql).iloc[0].to_dict()
         return {
             "revenue": float(row["revenue"] or 0),
@@ -106,7 +106,7 @@ class RetailAnalytics:
 
     def get_revenue_by_weekday(self) -> pd.DataFrame:
         """הכנסה מצטברת לפי יום בשבוע (מספר 0=ראשון … 6=שבת)."""
-        sql = load_sql("analytics_weekday.sql")
+        sql = load_sql_section("analytics.sql", "weekday")
         df = self._read_sql(sql)
         # תוויות באנגלית קצרות — הממשק יכול למפות לעברית לתצוגה
         names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
@@ -115,21 +115,21 @@ class RetailAnalytics:
 
     def get_invoice_revenue_distribution(self) -> pd.DataFrame:
         """סכום הכנסה לכל חשבונית (שורה לכל InvoiceNo)."""
-        sql = load_sql("analytics_invoice_distribution.sql")
+        sql = load_sql_section("analytics.sql", "invoice_distribution")
         df = self._read_sql(sql)
         df["invoice_revenue"] = pd.to_numeric(df["invoice_revenue"], errors="coerce").fillna(0.0)
         return df
 
     def get_rfm(self, *, q: int = 5) -> pd.DataFrame:
         """RFM לכל לקוח: עדכנות (ימים), תדירות (חשבוניות), כסף; ציונים וסגמנט."""
-        sql_max = load_sql("analytics_rfm_max_date.sql")
+        sql_max = load_sql_section("analytics.sql", "rfm_max_date")
         max_date_str = self._read_sql(sql_max).iloc[0]["max_date"]
         if pd.isna(max_date_str):
             return pd.DataFrame()
 
         max_dt = pd.to_datetime(max_date_str)
 
-        sql = load_sql("analytics_rfm_customers.sql")
+        sql = load_sql_section("analytics.sql", "rfm_customers")
         df = self._read_sql(sql)
         df["last_invoice"] = pd.to_datetime(df["last_invoice"], errors="coerce")
         df["recency_days"] = (max_dt - df["last_invoice"]).dt.total_seconds() / 86400.0

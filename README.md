@@ -46,8 +46,8 @@ Core principle: **separation of concerns**.
   KPI/RFM business computations used by the dashboard.
 - `src/retail_etl/meta.py`  
   Pipeline metadata tables (`meta_*`), runs, and alerts.
-- `src/retail_etl/sql/*.sql`  
-  SQL lives in SQL files (not hard-coded in Python).
+- `src/retail_etl/sql/{meta,etl,marts,analytics,app}.sql`  
+  Bundled SQL with named sections; loaded via `utils.load_sql_section` (not inlined in Python).
 - `src/retail_etl/cli.py`  
   Operational interface (`argparse`) for pipeline commands.
 - `app.py`  
@@ -220,7 +220,6 @@ Primary tabs:
 ## 11) Presentation assets
 
 - Personal Hebrew presentation guide: `docs/presentation_personal_guide_he.md`
-- One-page demo script (Hebrew): `docs/one_page_demo_script_he.md`
 
 Recommended flow in demo:
 1. Overview
@@ -328,7 +327,7 @@ Show:
 - Layer separation and SQL-first structure.
 
 Say:
-- "SQL resides in `src/retail_etl/sql/*.sql`; Python orchestrates."
+- "SQL lives in a few bundled files under `src/retail_etl/sql/`; Python loads named sections."
 - "This reduces hidden logic and improves reviewability."
 
 ### Tab 8 — `Project summary` (1 min)

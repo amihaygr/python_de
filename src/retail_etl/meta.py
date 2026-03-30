@@ -10,7 +10,7 @@ from typing import Any, Optional
 import sqlite3
 
 from .settings import get_paths
-from .utils import load_sql
+from .utils import load_sql_section
 
 
 def utc_now_iso() -> str:
@@ -30,7 +30,7 @@ def connect(db_path: Optional[Path] = None) -> sqlite3.Connection:
 
 
 def init_meta_tables(conn: sqlite3.Connection) -> None:
-    conn.executescript(load_sql("meta_init_tables.sql"))
+    conn.executescript(load_sql_section("meta.sql", "init_tables"))
     conn.commit()
 
 
@@ -42,13 +42,13 @@ def upsert_source_state(
     sha256: str,
 ) -> None:
     init_meta_tables(conn)
-    conn.execute(load_sql("meta_upsert_source_state.sql"), (dataset, filename, size_bytes, sha256, utc_now_iso()))
+    conn.execute(load_sql_section("meta.sql", "upsert_source_state"), (dataset, filename, size_bytes, sha256, utc_now_iso()))
     conn.commit()
 
 
 def get_source_state(conn: sqlite3.Connection) -> Optional[dict[str, Any]]:
     init_meta_tables(conn)
-    row = conn.execute(load_sql("meta_get_source_state.sql")).fetchone()
+    row = conn.execute(load_sql_section("meta.sql", "get_source_state")).fetchone()
     if not row:
         return None
     return {
@@ -62,22 +62,22 @@ def get_source_state(conn: sqlite3.Connection) -> Optional[dict[str, Any]]:
 
 def add_alert(conn: sqlite3.Connection, kind: str, message: str) -> None:
     init_meta_tables(conn)
-    conn.execute(load_sql("meta_add_alert.sql"), (utc_now_iso(), kind, message))
+    conn.execute(load_sql_section("meta.sql", "add_alert"), (utc_now_iso(), kind, message))
     conn.commit()
 
 
 def clear_alerts(conn: sqlite3.Connection, kind: Optional[str] = None) -> None:
     init_meta_tables(conn)
     if kind is None:
-        conn.execute(load_sql("meta_clear_alerts_all.sql"))
+        conn.execute(load_sql_section("meta.sql", "clear_alerts_all"))
     else:
-        conn.execute(load_sql("meta_clear_alerts_by_kind.sql"), (kind,))
+        conn.execute(load_sql_section("meta.sql", "clear_alerts_by_kind"), (kind,))
     conn.commit()
 
 
 def list_active_alerts(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     init_meta_tables(conn)
-    rows = conn.execute(load_sql("meta_list_active_alerts.sql")).fetchall()
+    rows = conn.execute(load_sql_section("meta.sql", "list_active_alerts")).fetchall()
     return [{"alert_id": r[0], "created_at": r[1], "kind": r[2], "message": r[3]} for r in rows]
 
 
@@ -90,7 +90,7 @@ class RunRecord:
 def start_run(conn: sqlite3.Connection, mode: str) -> RunRecord:
     init_meta_tables(conn)
     started = utc_now_iso()
-    cur = conn.execute(load_sql("meta_start_run.sql"), (started, mode, "running"))
+    cur = conn.execute(load_sql_section("meta.sql", "start_run"), (started, mode, "running"))
     conn.commit()
     return RunRecord(run_id=int(cur.lastrowid), started_at=started)
 
@@ -104,7 +104,7 @@ def finish_run(
     error: Optional[str] = None,
 ) -> None:
     init_meta_tables(conn)
-    conn.execute(load_sql("meta_finish_run.sql"), (utc_now_iso(), status, rows_written, error, run_id))
+    conn.execute(load_sql_section("meta.sql", "finish_run"), (utc_now_iso(), status, rows_written, error, run_id))
     conn.commit()
 
 
@@ -115,13 +115,13 @@ def upsert_schema_state(
     dtypes_json: str,
 ) -> None:
     init_meta_tables(conn)
-    conn.execute(load_sql("meta_upsert_schema_state.sql"), (columns_json, dtypes_json, utc_now_iso()))
+    conn.execute(load_sql_section("meta.sql", "upsert_schema_state"), (columns_json, dtypes_json, utc_now_iso()))
     conn.commit()
 
 
 def get_last_success(conn: sqlite3.Connection) -> Optional[dict[str, Any]]:
     init_meta_tables(conn)
-    row = conn.execute(load_sql("meta_get_last_success.sql")).fetchone()
+    row = conn.execute(load_sql_section("meta.sql", "get_last_success")).fetchone()
     if not row:
         return None
     return {"run_id": row[0], "finished_at": row[1], "mode": row[2], "rows_written": row[3]}

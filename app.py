@@ -267,7 +267,6 @@ def main() -> None:
             min_value=min_dt,
             max_value=max_dt,
             format="YYYY-MM-DD",
-            width="content",
         )
         if isinstance(date_range, tuple) and len(date_range) == 2:
             from_date, to_date = date_range

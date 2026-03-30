@@ -1,0 +1,22 @@
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+env/
+
+# Local data & artifacts
+data/raw/*.csv
+data/db/
+data/exports/
+reports/
+
+# Build artifacts
+*.egg-info/
+
+# Streamlit secrets (never commit)
+.streamlit/secrets.toml
+
+# Editor (local)
+.vscode/

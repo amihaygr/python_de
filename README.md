@@ -6,6 +6,20 @@ Default Kaggle source:
 - Dataset slug: `dp1224/online-retail-csv`
 - File: `online_retail.csv`
 
+### Git workflow (branches)
+
+- **Daily work:** commit on **`dev`** and **`git push origin dev`**.
+- **Release to `main`:** open a **Pull Request** `dev` → `main` and merge on GitHub when satisfied.
+- **After each merge to `main`:** keep **`dev` aligned with `main`** so both track the same history (avoid “drift”). From your machine:
+
+  ```bash
+  git checkout dev
+  git pull origin main
+  git push origin dev
+  ```
+
+  If Git fast-forwards `dev` to the merge commit on `main`, you are synced.
+
 ---
 
 ## 1) Project objectives

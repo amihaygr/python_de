@@ -341,13 +341,12 @@ def main() -> None:
 
     analytics = RetailAnalytics(db_path)
 
-    st.markdown('<p class="strip-label">Filtered scope (all tabs)</p>', unsafe_allow_html=True)
-    sc1, sc2, sc3, sc4 = st.columns(4)
-    sc1.metric("Rows", f"{len(filtered_df):,}")
-    sc2.metric("Invoices", f"{filtered_df['InvoiceNo'].nunique():,}")
-    sc3.metric("Customers", f"{filtered_df['CustomerID'].nunique():,}")
-    sc4.metric("Countries selected", len(selected_countries))
-    st.divider()
+    st.caption(
+        f"**Filtered scope:** {len(filtered_df):,} rows · "
+        f"{filtered_df['InvoiceNo'].nunique():,} invoices · "
+        f"{filtered_df['CustomerID'].nunique():,} customers · "
+        f"{len(selected_countries)} countries (sidebar) — applies to all tabs below."
+    )
 
     (
         tab_intro,
@@ -407,7 +406,7 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
         c3.metric("Countries", f"{info['countries']:,}")
         c4.metric("Date range", f"{info['min_date']} → {info['max_date']}")
         st.caption(
-            "Same filtered grain as the **Filtered scope** bar above — full-database counts are the four headline metrics."
+            "Full-database snapshot after ETL (not the filtered slice). Use sidebar filters to narrow charts."
         )
 
         st.subheader("Operational status")

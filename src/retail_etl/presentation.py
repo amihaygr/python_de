@@ -132,8 +132,8 @@ PRESENTER_HINTS: dict[str, str] = {
 **Goal:** Show the system is *governed* — not only charts, but source, runs, and alerts.
 
 **Walk through in order**
-1. **Four headline metrics** — scope after cleaning (rows, customers, countries, date range). Say: “This is the grain every downstream chart uses.”
-2. **“Slicer result” line** — how many rows remain after sidebar filters. Say: “Everything from here on respects the same filters — no ETL rerun.”
+1. **Filtered scope caption** (above tabs) — one line: rows / invoices / customers / countries from sidebar filters. Say: “All tabs share this slice; no ETL rerun when you change filters.”
+2. **Dataset scope** — four metrics = **full** staging database after ETL (not the filtered slice). Say: “This is the governed grain for the whole project.”
 3. **Operational status** — last successful refresh, run mode, alert count. Say: “A successful check is recorded even when data did not change — so the timestamp updates.”
 4. **Fingerprint / SHA** — Say: “You can defend auditability against the raw file.”
 5. **Run refresh check** — Say: “This triggers monitoring against Kaggle/CSV: fingerprint, schema, controlled load.”

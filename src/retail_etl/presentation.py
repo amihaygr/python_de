@@ -22,7 +22,7 @@ APP_STYLE = """
         padding-bottom: 2.5rem;
         font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
-    .main h1 { font-weight: 650; letter-spacing: -0.03em; color: #0f172a; }
+    .main h1:not(.retail-hero-title) { font-weight: 650; letter-spacing: -0.03em; color: #0f172a; }
     .main h2, .main h3 { font-weight: 600; letter-spacing: -0.02em; color: #0f172a; margin-top: 0.25rem; }
     .main .stMarkdown p { line-height: 1.55; color: #334155; }
     section[data-testid="stSidebar"] {
@@ -79,41 +79,96 @@ APP_STYLE = """
         font-weight: 500;
         padding: 0.45rem 0.85rem;
     }
-    /* Hero */
+    /* Hero — report-style masthead */
     .retail-hero {
-        background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 48%, #ffffff 100%);
+        position: relative;
         border: 1px solid var(--retail-border);
-        border-radius: 14px;
-        padding: 1.25rem 1.5rem 1.1rem 1.5rem;
-        margin-bottom: 0.5rem;
-        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        border-radius: 16px;
+        margin-bottom: 0.65rem;
+        overflow: hidden;
+        background: linear-gradient(165deg, #ffffff 0%, #f8fafc 55%, #eff6ff 120%);
+        box-shadow:
+            0 1px 2px rgba(15, 23, 42, 0.05),
+            0 12px 40px -18px rgba(29, 78, 216, 0.35);
+    }
+    .retail-hero::after {
+        content: "";
+        position: absolute;
+        top: -40%;
+        right: -15%;
+        width: 55%;
+        height: 120%;
+        background: radial-gradient(ellipse at center, rgba(29, 78, 216, 0.09) 0%, transparent 68%);
+        pointer-events: none;
+    }
+    .retail-hero-bar {
+        height: 5px;
+        width: 100%;
+        background: linear-gradient(90deg, #1d4ed8 0%, #0ea5e9 42%, #14b8a6 88%);
+    }
+    .retail-hero-inner {
+        position: relative;
+        z-index: 1;
+        padding: 1.35rem 1.65rem 1.35rem 1.65rem;
+    }
+    .retail-hero-eyebrow {
+        margin: 0 0 0.5rem 0;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: #3b82f6;
     }
     .retail-hero-title {
-        margin: 0 0 0.35rem 0;
-        font-size: 1.85rem;
-        font-weight: 700;
-        letter-spacing: -0.03em;
+        margin: 0 0 0.55rem 0;
+        font-size: clamp(1.65rem, 4vw, 2.35rem);
+        font-weight: 800;
+        letter-spacing: -0.045em;
+        line-height: 1.12;
         color: #0f172a;
-        line-height: 1.2;
+        border: none;
+        padding: 0;
+    }
+    .retail-hero-title span.retail-hero-gradient {
+        background: linear-gradient(115deg, #0f172a 0%, #1e40af 38%, #1d4ed8 72%, #0d9488 130%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    @supports not (background-clip: text) {
+        .retail-hero-title span.retail-hero-gradient { -webkit-text-fill-color: #0f172a; background: none; }
+    }
+    .retail-hero-rule {
+        width: 3.5rem;
+        height: 4px;
+        border-radius: 2px;
+        background: linear-gradient(90deg, #1d4ed8, #14b8a6);
+        margin: 0 0 0.85rem 0;
+        opacity: 0.9;
     }
     .retail-hero-subtitle {
         margin: 0;
-        font-size: 0.98rem;
+        font-size: 1.02rem;
         color: #475569;
-        line-height: 1.45;
-        max-width: 52rem;
+        line-height: 1.55;
+        max-width: 46rem;
+        font-weight: 400;
     }
 </style>
 """
 
 
-def render_app_hero(st, *, title: str, subtitle: str) -> None:
-    """Top-of-page title block (styled via APP_STYLE `.retail-hero`)."""
+def render_app_hero(st, *, eyebrow: str, title: str, subtitle: str) -> None:
+    """Top-of-page masthead (styled via APP_STYLE `.retail-hero`)."""
     st.markdown(
         '<div class="retail-hero">'
-        f'<p class="retail-hero-title">{html.escape(title)}</p>'
+        '<div class="retail-hero-bar"></div>'
+        '<div class="retail-hero-inner">'
+        f'<p class="retail-hero-eyebrow">{html.escape(eyebrow)}</p>'
+        f'<h1 class="retail-hero-title"><span class="retail-hero-gradient">{html.escape(title)}</span></h1>'
+        '<div class="retail-hero-rule"></div>'
         f'<p class="retail-hero-subtitle">{html.escape(subtitle)}</p>'
-        "</div>",
+        "</div></div>",
         unsafe_allow_html=True,
     )
 

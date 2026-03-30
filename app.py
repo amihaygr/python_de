@@ -154,7 +154,7 @@ def main() -> None:
     configure_logging(os.environ.get("RETAIL_ETL_LOG_LEVEL", "INFO"))
 
     st.set_page_config(
-        page_title="Retail Analytics | Executive & Technical Dashboard",
+        page_title="Retail sales intelligence · Analytics report",
         layout="wide",
         initial_sidebar_state="expanded",
     )
@@ -166,9 +166,10 @@ def main() -> None:
 
     render_app_hero(
         st,
+        eyebrow="Interactive analytics report",
         title="Retail sales intelligence",
         subtitle=(
-            "Governed path from raw CSV to SQLite: live KPIs, shared filters across tabs, "
+            "A governed pipeline from raw CSV to SQLite — live KPIs, filters shared across every tab, "
             "and optional Kaggle refresh with fingerprint checks."
         ),
     )

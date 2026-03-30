@@ -26,7 +26,7 @@ from retail_etl.presentation import (
     APP_STYLE,
     project_root_from_app,
     render_architecture_presentation,
-    render_hebrew_presenter_hint,
+    render_presenter_hint,
     render_pipeline_sankey,
 )
 from retail_etl.utils import load_sql
@@ -185,9 +185,9 @@ def main() -> None:
     executive = view_mode == "Executive"
 
     show_presenter_hints = st.sidebar.checkbox(
-        "Show Hebrew presenter hints",
+        "Show presenter hints",
         value=False,
-        help="בכל טאב: מ expander עם מה להגיד בעברית (מסונכרן עם docs/presentation_personal_guide_he.md).",
+        help="English talking points per tab (expander). Detailed Hebrew script: docs/presentation_personal_guide_he.md.",
     )
     if show_presenter_hints:
         st.markdown(
@@ -357,7 +357,7 @@ def main() -> None:
     )
 
     with tab_intro:
-        render_hebrew_presenter_hint(st, "intro", enabled=show_presenter_hints)
+        render_presenter_hint(st, "intro", enabled=show_presenter_hints)
         st.subheader("Dataset scope")
         if executive:
             st.markdown(
@@ -466,11 +466,11 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
         render_pipeline_sankey(st)
 
     with tab_arch:
-        render_hebrew_presenter_hint(st, "arch", enabled=show_presenter_hints)
+        render_presenter_hint(st, "arch", enabled=show_presenter_hints)
         render_architecture_presentation(st, root, executive_mode=executive)
 
     with tab_overview:
-        render_hebrew_presenter_hint(st, "kpis", enabled=show_presenter_hints)
+        render_presenter_hint(st, "kpis", enabled=show_presenter_hints)
         total_revenue = float(filtered_kpis["revenue"])
         total_units = float(filtered_kpis["units"])
         total_invoices = float(filtered_kpis["invoices"])
@@ -638,7 +638,7 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
             st.caption(f"Median **{q50:,.2f}** · P90 **{q90:,.2f}** · P95 **{q95:,.2f}**")
 
     with tab_products:
-        render_hebrew_presenter_hint(st, "products", enabled=show_presenter_hints)
+        render_presenter_hint(st, "products", enabled=show_presenter_hints)
         st.subheader("Top products by revenue")
         top_n = st.slider("Top N", min_value=5, max_value=30, value=10, step=5, key="p")
         top_products = products_filtered.head(top_n)
@@ -664,7 +664,7 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
             st.caption("Concentration risk: a small set of SKUs may dominate; validate with Pareto offline if needed.")
 
     with tab_customers:
-        render_hebrew_presenter_hint(st, "customers", enabled=show_presenter_hints)
+        render_presenter_hint(st, "customers", enabled=show_presenter_hints)
         st.subheader("Top customers by revenue")
         top_n_c = st.slider("Top N", min_value=5, max_value=30, value=10, step=5, key="c")
         top_customers = customers_filtered.head(top_n_c)
@@ -690,7 +690,7 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
             st.caption("Consider combining with RFM tab for lifecycle actions (retain / reactivate).")
 
     with tab_countries:
-        render_hebrew_presenter_hint(st, "countries", enabled=show_presenter_hints)
+        render_presenter_hint(st, "countries", enabled=show_presenter_hints)
         st.subheader("Top countries by revenue")
         top_n_co = st.slider("Top N", min_value=5, max_value=30, value=10, step=5, key="co")
         top_countries = countries_filtered.head(top_n_co)
@@ -712,7 +712,7 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
             st.caption("Slice further with `mart_country_summary` exports if you add currency or cost data later.")
 
     with tab_deep:
-        render_hebrew_presenter_hint(st, "rfm", enabled=show_presenter_hints)
+        render_presenter_hint(st, "rfm", enabled=show_presenter_hints)
         st.subheader("RFM customer segmentation")
         st.caption(
             "**R**ecency (days since last purchase), **F**requency (invoice count), **M**onetary (cumulative revenue)."
@@ -849,7 +849,7 @@ rfm_df = analytics.get_rfm(q=5)
                 st.code(_cached_get_rfm_source(), language="python")
 
     with tab_explain:
-        render_hebrew_presenter_hint(st, "summary", enabled=show_presenter_hints)
+        render_presenter_hint(st, "summary", enabled=show_presenter_hints)
         if executive:
             st.markdown(
                 """
@@ -881,7 +881,7 @@ For engineering depth, switch sidebar mode to **Technical** or open the **Archit
             )
 
     with tab_table:
-        render_hebrew_presenter_hint(st, "staging", enabled=show_presenter_hints)
+        render_presenter_hint(st, "staging", enabled=show_presenter_hints)
         st.subheader("Central staging table: `stg_sales_clean`")
         st.caption("Built after transform; all marts are derived from this table.")
         st.caption("Preview below respects sidebar slicers.")

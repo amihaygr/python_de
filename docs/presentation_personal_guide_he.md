@@ -1,6 +1,6 @@
 # מדריך אישי להצגת פרויקט Retail ETL (מפורט)
 
-> **סנכרון עם האפליקציה:** ב־Streamlit, בסרגל הצד, סמן **Show Hebrew presenter hints** — בכל טאב יופיע Expander בעברית עם אותו תסריט תמציתי. התרשים האינטראקטיבי של הזרימה (Sankey) נמצא בטאב **Overview** תחת "Pipeline at a glance". מקור הקוד של הרמזים: `PRESENTER_HINTS_HE` ב־`src/retail_etl/presentation.py`.
+> **סנכרון עם האפליקציה:** ב־Streamlit, בסרגל הצד, סמן **Show presenter hints** — בכל טאב יופיע Expander **באנגלית** (אותו סדר נושאים כמו במדריך הזה). המדריך בעברית כאן הוא הרחבה מפורטת להצגה חיה. התרשים האינטראקטיבי (Sankey) בטאב **Overview** תחת "Pipeline at a glance". מקור הקוד: `PRESENTER_HINTS` ב־`src/retail_etl/presentation.py`.
 
 ## מטרת ההצגה
 

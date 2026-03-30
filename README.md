@@ -193,6 +193,7 @@ Primary tabs:
 ## 11) Presentation assets
 
 - Personal Hebrew presentation guide: `docs/presentation_personal_guide_he.md`
+- One-page demo script (Hebrew): `docs/one_page_demo_script_he.md`
 
 Recommended flow in demo:
 1. Overview

@@ -146,6 +146,9 @@ def check_for_update(
         if not changed:
             # Keep `updated_at` as "last checked" so the dashboard reflects successful refresh checks.
             upsert_source_state(conn, dataset, filename, fp.size_bytes, fp.sha256)
+            # Record a successful noop run so "Last successful refresh" reflects the latest check.
+            run = start_run(conn, mode="noop")
+            finish_run(conn, run.run_id, status="success", rows_written=0)
             logger.debug("No change detected for %s (sha256 unchanged).", csv_path)
             return {"action": "noop", "changed": False}
 

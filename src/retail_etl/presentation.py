@@ -44,7 +44,7 @@ PRESENTER_HINTS_HE: dict[str, str] = {
 3. **Operational status** — “Last successful refresh”, מצב ריצה, מספר alerts. אמור: “גם אם הנתונים לא השתנו, בדיקה מוצלחת נרשמת — לכן התאריך מתעדכן”.
 4. **טביעת אצבע / SHA** — אמור: “אפשר להוכיח בביקורת שמקור הקובץ זהה למה שטענו”.
 5. **כפתור Run refresh check** — אמור: “כאן מפעילים ניטור מול Kaggle/CSV: fingerprint, סכימה, וטעינה מבוקרת”.
-6. **תרשים הזרימה (Sankey) למטה** — אמור: “זה אותו תרשים לוגי שמופיע במסמך ההצגה — רק כאן הוא חי ואפשר להצמיד אותו לסיפור E→T→L”.
+6. **תרשים הזרימה (Sankey) למטה** — אמור: “שלבים ממוספרים ①–⑦, רקע בהיר וטקסט כהה לקריאה מרחוק; אותו סיפור כמו במסמך ההצגה — E→T→L ופיצול ל־marts מול meta לפני הדשבורד”.
 """,
     "kpis": """
 **מטרה:** להראות מגמות, עונתיות, והתפלגות — *בהקשר המסונן*.
@@ -128,54 +128,75 @@ def render_hebrew_presenter_hint(st, tab_key: str, *, enabled: bool) -> None:
 
 def render_pipeline_sankey(st, *, colorway: list[str] | None = None) -> None:
     """Interactive pipeline diagram (same logical story as the Mermaid diagram in the presentation doc)."""
+    # Light node fills so default label text stays dark-on-light and highly readable (not grey-on-grey flows).
     colors = colorway or [
-        "#1D4ED8",
-        "#0EA5E9",
-        "#14B8A6",
-        "#22C55E",
-        "#F59E0B",
-        "#A855F7",
-        "#64748B",
+        "#BFDBFE",
+        "#BAE6FD",
+        "#99F6E4",
+        "#BBF7D0",
+        "#FDE68A",
+        "#DDD6FE",
+        "#CBD5E1",
     ]
     labels = [
-        "Kaggle / local CSV",
-        "Ingest + fingerprint",
-        "clean_sales (Pandas)",
-        "stg_sales_clean",
-        "Mart tables",
-        "Meta (runs / alerts)",
-        "Streamlit + Plotly",
+        "① Kaggle / local CSV",
+        "② Ingest + fingerprint",
+        "③ clean_sales (Pandas)",
+        "④ stg_sales_clean",
+        "⑤ Mart tables",
+        "⑥ Meta (runs / alerts)",
+        "⑦ Streamlit + Plotly",
     ]
     # Logical flow: linear ETL + parallel observability into the dashboard
     source = [0, 1, 2, 3, 3, 4, 5]
     target = [1, 2, 3, 4, 5, 6, 6]
     value = [10, 10, 10, 10, 10, 10, 10]
+    n_links = len(source)
+    link_colors = ["rgba(100, 116, 139, 0.22)"] * n_links
     fig = go.Figure(
         data=[
             go.Sankey(
                 arrangement="snap",
+                valueformat=".0f",
+                textfont=dict(
+                    family="Segoe UI, system-ui, sans-serif",
+                    size=15,
+                    color="#0f172a",
+                ),
                 node=dict(
-                    pad=18,
-                    thickness=20,
-                    line=dict(color="rgba(0,0,0,0.35)", width=0.5),
+                    pad=28,
+                    thickness=36,
+                    line=dict(color="#64748B", width=1),
                     label=labels,
                     color=colors[: len(labels)],
+                    hovertemplate="%{label}<extra></extra>",
                 ),
-                link=dict(source=source, target=target, value=value),
+                link=dict(
+                    source=source,
+                    target=target,
+                    value=value,
+                    color=link_colors,
+                ),
             )
         ]
     )
     fig.update_layout(
-        title=dict(text="Data pipeline — logical flow (matches presentation guide)", font=dict(size=15)),
-        height=440,
-        margin=dict(l=10, r=10, t=50, b=10),
-        font=dict(family="Arial, sans-serif", size=12),
-        paper_bgcolor="#fafafa",
+        title=dict(
+            text="Data pipeline — logical flow (same story as the presentation guide)",
+            font=dict(size=17, color="#0f172a"),
+            x=0.02,
+            xanchor="left",
+        ),
+        height=500,
+        margin=dict(l=24, r=24, t=64, b=32),
+        font=dict(family="Segoe UI, system-ui, sans-serif", size=14, color="#0f172a"),
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
     )
     st.plotly_chart(fig, width="stretch")
     st.caption(
-        "Sankey widths are illustrative (equal flow). The important part is the **sequence** and the split into "
-        "**marts** vs **metadata** before the dashboard."
+        "Flows are **even widths** (illustrative). Read the **numbered** stages left → right; staging splits into "
+        "**marts** vs **meta**, then both feed the dashboard."
     )
 
 

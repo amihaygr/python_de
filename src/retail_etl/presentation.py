@@ -103,14 +103,6 @@ APP_STYLE = """
         line-height: 1.45;
         max-width: 52rem;
     }
-    p.strip-label {
-        font-size: 0.72rem;
-        font-weight: 700;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        color: var(--retail-muted);
-        margin: 0 0 0.5rem 0;
-    }
 </style>
 """
 

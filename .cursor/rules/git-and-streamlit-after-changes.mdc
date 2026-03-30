@@ -8,7 +8,8 @@ alwaysApply: true
 When the user’s request **changes project code or config** (not for pure Q&A):
 
 1. **Git**
-   - Run `git status`. If there are changes: `git add -A`, `git commit` with a clear English or Hebrew message, `git push` to the current branch (usually `dev`).
+   - Run `git status`. If there are changes: `git add -A`, `git commit` with a clear English or Hebrew message, `git push origin dev` (work on `dev` unless the user asked otherwise).
+   - **Merge to `main`:** after a successful push to `dev`, merge into `main` and push: `git checkout main && git pull origin main && git merge dev -m "Merge dev"` && `git push origin main`, then `git checkout dev`.
    - If the working tree is clean, say so explicitly; do not create empty commits.
 
 2. **Streamlit / Docker**

@@ -22,7 +22,13 @@ from retail_etl.analytics import (
 from retail_etl.local_time import format_utc_iso_as_israel, localize_alert_rows
 from retail_etl.meta import clear_alerts, connect as meta_connect, get_last_success, get_source_state, list_active_alerts
 from retail_etl.monitor import check_for_update
-from retail_etl.presentation import APP_STYLE, project_root_from_app, render_architecture_presentation
+from retail_etl.presentation import (
+    APP_STYLE,
+    project_root_from_app,
+    render_architecture_presentation,
+    render_hebrew_presenter_hint,
+    render_pipeline_sankey,
+)
 from retail_etl.utils import load_sql
 from retail_etl.settings import DEFAULT_RETAIL_KAGGLE_DATASET, DEFAULT_RETAIL_KAGGLE_FILENAME, Settings
 from retail_etl.utils import configure_logging
@@ -177,6 +183,17 @@ def main() -> None:
         ),
     )
     executive = view_mode == "Executive"
+
+    show_presenter_hints = st.sidebar.checkbox(
+        "Show Hebrew presenter hints",
+        value=False,
+        help="בכל טאב: מ expander עם מה להגיד בעברית (מסונכרן עם docs/presentation_personal_guide_he.md).",
+    )
+    if show_presenter_hints:
+        st.markdown(
+            "<style>.main .block-container { max-width: 1320px !important; }</style>",
+            unsafe_allow_html=True,
+        )
 
     st.sidebar.markdown("---")
     st.sidebar.subheader("Data refresh (optional)")
@@ -340,6 +357,7 @@ def main() -> None:
     )
 
     with tab_intro:
+        render_hebrew_presenter_hint(st, "intro", enabled=show_presenter_hints)
         st.subheader("Dataset scope")
         if executive:
             st.markdown(
@@ -445,11 +463,14 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
         st.markdown(
             "**Extract** → CSV / Kaggle · **Transform** → Pandas · **Load** → SQLite (staging + marts) · **Serve** → this app."
         )
+        render_pipeline_sankey(st)
 
     with tab_arch:
+        render_hebrew_presenter_hint(st, "arch", enabled=show_presenter_hints)
         render_architecture_presentation(st, root, executive_mode=executive)
 
     with tab_overview:
+        render_hebrew_presenter_hint(st, "kpis", enabled=show_presenter_hints)
         total_revenue = float(filtered_kpis["revenue"])
         total_units = float(filtered_kpis["units"])
         total_invoices = float(filtered_kpis["invoices"])
@@ -617,6 +638,7 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
             st.caption(f"Median **{q50:,.2f}** · P90 **{q90:,.2f}** · P95 **{q95:,.2f}**")
 
     with tab_products:
+        render_hebrew_presenter_hint(st, "products", enabled=show_presenter_hints)
         st.subheader("Top products by revenue")
         top_n = st.slider("Top N", min_value=5, max_value=30, value=10, step=5, key="p")
         top_products = products_filtered.head(top_n)
@@ -642,6 +664,7 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
             st.caption("Concentration risk: a small set of SKUs may dominate; validate with Pareto offline if needed.")
 
     with tab_customers:
+        render_hebrew_presenter_hint(st, "customers", enabled=show_presenter_hints)
         st.subheader("Top customers by revenue")
         top_n_c = st.slider("Top N", min_value=5, max_value=30, value=10, step=5, key="c")
         top_customers = customers_filtered.head(top_n_c)
@@ -667,6 +690,7 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
             st.caption("Consider combining with RFM tab for lifecycle actions (retain / reactivate).")
 
     with tab_countries:
+        render_hebrew_presenter_hint(st, "countries", enabled=show_presenter_hints)
         st.subheader("Top countries by revenue")
         top_n_co = st.slider("Top N", min_value=5, max_value=30, value=10, step=5, key="co")
         top_countries = countries_filtered.head(top_n_co)
@@ -688,6 +712,7 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
             st.caption("Slice further with `mart_country_summary` exports if you add currency or cost data later.")
 
     with tab_deep:
+        render_hebrew_presenter_hint(st, "rfm", enabled=show_presenter_hints)
         st.subheader("RFM customer segmentation")
         st.caption(
             "**R**ecency (days since last purchase), **F**requency (invoice count), **M**onetary (cumulative revenue)."
@@ -696,102 +721,100 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
         rfm_df = compute_rfm_from_frame(filtered_df, q=5)
         if rfm_df.empty:
             st.warning("No RFM rows available (check staging dates).")
-            return
-
-        c_r1, c_r2, c_r3 = st.columns(3)
-        max_recency = float(max(rfm_df["recency_days"].max(), 1.0))
-        recency_max = c_r1.slider(
-            "Max recency (days)",
-            min_value=0.0,
-            max_value=max_recency,
-            value=max_recency,
-            step=1.0,
-            key="rfm_recency_max",
-        )
-        min_frequency = c_r2.slider(
-            "Min frequency (invoices)",
-            min_value=1,
-            max_value=int(max(rfm_df["frequency"].max(), 1)),
-            value=1,
-            step=1,
-            key="rfm_freq_min",
-        )
-        min_monetary = c_r3.slider(
-            "Min monetary",
-            min_value=0.0,
-            max_value=float(max(rfm_df["monetary"].quantile(0.99), 1.0)),
-            value=0.0,
-            step=10.0,
-            key="rfm_monetary_min",
-        )
-        seg_options = sorted(rfm_df["rfm_segment"].dropna().astype(str).unique().tolist())
-        seg_selected = st.multiselect(
-            "RFM segments",
-            options=seg_options,
-            default=seg_options[: min(15, len(seg_options))] if len(seg_options) > 15 else seg_options,
-            key="rfm_segments",
-        )
-        rfm_df = rfm_df[
-            (rfm_df["recency_days"] <= recency_max)
-            & (rfm_df["frequency"] >= min_frequency)
-            & (rfm_df["monetary"] >= min_monetary)
-        ].copy()
-        if seg_selected:
-            rfm_df = rfm_df[rfm_df["rfm_segment"].isin(seg_selected)]
-        if rfm_df.empty:
-            st.warning("No customers match current RFM slicers. Relax the RFM filters.")
-            return
-
-        seg_counts = (
-            rfm_df.groupby("rfm_segment")
-            .agg(
-                customers=("CustomerID", "count"),
-                avg_monetary=("monetary", "mean"),
-                avg_recency=("recency_days", "mean"),
+        else:
+            c_r1, c_r2, c_r3 = st.columns(3)
+            max_recency = float(max(rfm_df["recency_days"].max(), 1.0))
+            recency_max = c_r1.slider(
+                "Max recency (days)",
+                min_value=0.0,
+                max_value=max_recency,
+                value=max_recency,
+                step=1.0,
+                key="rfm_recency_max",
             )
-            .reset_index()
-            .sort_values("customers", ascending=False)
-            .head(20)
-        )
+            min_frequency = c_r2.slider(
+                "Min frequency (invoices)",
+                min_value=1,
+                max_value=int(max(rfm_df["frequency"].max(), 1)),
+                value=1,
+                step=1,
+                key="rfm_freq_min",
+            )
+            min_monetary = c_r3.slider(
+                "Min monetary",
+                min_value=0.0,
+                max_value=float(max(rfm_df["monetary"].quantile(0.99), 1.0)),
+                value=0.0,
+                step=10.0,
+                key="rfm_monetary_min",
+            )
+            seg_options = sorted(rfm_df["rfm_segment"].dropna().astype(str).unique().tolist())
+            seg_selected = st.multiselect(
+                "RFM segments",
+                options=seg_options,
+                default=seg_options[: min(15, len(seg_options))] if len(seg_options) > 15 else seg_options,
+                key="rfm_segments",
+            )
+            rfm_df = rfm_df[
+                (rfm_df["recency_days"] <= recency_max)
+                & (rfm_df["frequency"] >= min_frequency)
+                & (rfm_df["monetary"] >= min_monetary)
+            ].copy()
+            if seg_selected:
+                rfm_df = rfm_df[rfm_df["rfm_segment"].isin(seg_selected)]
+            if rfm_df.empty:
+                st.warning("No customers match current RFM slicers. Relax the RFM filters.")
+            else:
+                seg_counts = (
+                    rfm_df.groupby("rfm_segment")
+                    .agg(
+                        customers=("CustomerID", "count"),
+                        avg_monetary=("monetary", "mean"),
+                        avg_recency=("recency_days", "mean"),
+                    )
+                    .reset_index()
+                    .sort_values("customers", ascending=False)
+                    .head(20)
+                )
 
-        seg_fig = px.bar(
-            seg_counts,
-            x="rfm_segment",
-            y="customers",
-            title="Largest RFM segments (by customer count)",
-            labels={"rfm_segment": "RFM segment", "customers": "Customers"},
-            color="avg_monetary",
-            color_continuous_scale="Turbo",
-            text_auto=True,
-        )
-        seg_fig.update_layout(xaxis_tickangle=-45)
-        _style_fig(seg_fig, height=440)
-        st.plotly_chart(seg_fig, width="stretch")
+                seg_fig = px.bar(
+                    seg_counts,
+                    x="rfm_segment",
+                    y="customers",
+                    title="Largest RFM segments (by customer count)",
+                    labels={"rfm_segment": "RFM segment", "customers": "Customers"},
+                    color="avg_monetary",
+                    color_continuous_scale="Turbo",
+                    text_auto=True,
+                )
+                seg_fig.update_layout(xaxis_tickangle=-45)
+                _style_fig(seg_fig, height=440)
+                st.plotly_chart(seg_fig, width="stretch")
 
-        bubble = px.scatter(
-            rfm_df,
-            x="recency_days",
-            y="frequency",
-            size="monetary",
-            color="rfm_segment",
-            title="RFM bubble map (Recency vs Frequency, bubble size = Monetary)",
-            labels={"recency_days": "Recency (days)", "frequency": "Frequency"},
-            hover_data={"CustomerID": True, "monetary": ":.2f"},
-            size_max=35,
-        )
-        _style_fig(bubble, height=460)
-        st.plotly_chart(bubble, width="stretch")
+                bubble = px.scatter(
+                    rfm_df,
+                    x="recency_days",
+                    y="frequency",
+                    size="monetary",
+                    color="rfm_segment",
+                    title="RFM bubble map (Recency vs Frequency, bubble size = Monetary)",
+                    labels={"recency_days": "Recency (days)", "frequency": "Frequency"},
+                    hover_data={"CustomerID": True, "monetary": ":.2f"},
+                    size_max=35,
+                )
+                _style_fig(bubble, height=460)
+                st.plotly_chart(bubble, width="stretch")
 
-        best = rfm_df.sort_values("monetary", ascending=False).head(1).iloc[0]
-        st.caption(
-            f"Highest monetary customer **{int(best['CustomerID'])}** · "
-            f"revenue {best['monetary']:,.2f} · invoices {int(best['frequency'])} · "
-            f"recency {best['recency_days']:.1f} days."
-        )
+                best = rfm_df.sort_values("monetary", ascending=False).head(1).iloc[0]
+                st.caption(
+                    f"Highest monetary customer **{int(best['CustomerID'])}** · "
+                    f"revenue {best['monetary']:,.2f} · invoices {int(best['frequency'])} · "
+                    f"recency {best['recency_days']:.1f} days."
+                )
 
-        with st.expander("RetailAnalytics class — purpose & API", expanded=not executive):
-            st.markdown(
-                """
+            with st.expander("RetailAnalytics class — purpose & API", expanded=not executive):
+                st.markdown(
+                    """
 The UI stays thin; quantitative logic lives in **`src/retail_etl/analytics.py`** (`RetailAnalytics`).
 
 | Method | Use |
@@ -804,10 +827,10 @@ The UI stays thin; quantitative logic lives in **`src/retail_etl/analytics.py`**
 | `normalize_weekday_hour_pivot_rows(pivot)` | Row-wise % of weekday (for shape comparison) |
 | `weekday_hour_pivot_slice_hours(pivot, lo, hi)` | Hour column slice (business window) |
 """
-            )
-            st.divider()
-            st.markdown("**Usage example (same pattern as this app):**")
-            sample_usage = """from pathlib import Path
+                )
+                st.divider()
+                st.markdown("**Usage example (same pattern as this app):**")
+                sample_usage = """from pathlib import Path
 from retail_etl.analytics import RetailAnalytics
 
 db_path = Path("data/db/retail.db")
@@ -816,16 +839,17 @@ analytics = RetailAnalytics(db_path)
 kpis = analytics.get_kpis()
 rfm_df = analytics.get_rfm(q=5)
 """
-            st.code(sample_usage, language="python")
+                st.code(sample_usage, language="python")
 
-        with st.expander("`get_rfm` implementation (technical)", expanded=not executive):
-            @st.cache_data(ttl=3600)
-            def _cached_get_rfm_source() -> str:
-                return inspect.getsource(RetailAnalytics.get_rfm)
+            with st.expander("`get_rfm` implementation (technical)", expanded=not executive):
+                @st.cache_data(ttl=3600)
+                def _cached_get_rfm_source() -> str:
+                    return inspect.getsource(RetailAnalytics.get_rfm)
 
-            st.code(_cached_get_rfm_source(), language="python")
+                st.code(_cached_get_rfm_source(), language="python")
 
     with tab_explain:
+        render_hebrew_presenter_hint(st, "summary", enabled=show_presenter_hints)
         if executive:
             st.markdown(
                 """
@@ -857,6 +881,7 @@ For engineering depth, switch sidebar mode to **Technical** or open the **Archit
             )
 
     with tab_table:
+        render_hebrew_presenter_hint(st, "staging", enabled=show_presenter_hints)
         st.subheader("Central staging table: `stg_sales_clean`")
         st.caption("Built after transform; all marts are derived from this table.")
         st.caption("Preview below respects sidebar slicers.")

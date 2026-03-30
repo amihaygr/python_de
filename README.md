@@ -186,7 +186,7 @@ Primary tabs:
 - Products
 - Customers
 - Countries
-- RFM & analytics class
+- RFM & analytics
 - Architecture
 - Project summary
 - Staging table
@@ -311,7 +311,7 @@ Say:
 - "These views expose concentration risk and growth opportunities."
 - "The same filter context applies, so comparisons are consistent."
 
-### Tab 6 — `RFM & analytics class` (2 min)
+### Tab 6 — `RFM & analytics` (2 min)
 
 Show:
 - RFM segment chart.

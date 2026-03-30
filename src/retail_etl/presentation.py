@@ -2,35 +2,128 @@
 
 from __future__ import annotations
 
+import html
 from pathlib import Path
 
 import plotly.graph_objects as go
 
-# Subtle, presentation-friendly styling (LTR, English UI)
+# Presentation-friendly styling (LTR, English UI). Pairs with `.streamlit/config.toml` theme.
 APP_STYLE = """
 <style>
-    .main .block-container {
-        max-width: 1200px;
-        padding-top: 0.75rem;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    :root {
+        --retail-surface: #f8fafc;
+        --retail-border: #e2e8f0;
+        --retail-accent: #1d4ed8;
+        --retail-muted: #64748b;
     }
-    h1 { font-weight: 600; letter-spacing: -0.02em; }
-    h2, h3 { font-weight: 600; }
-    [data-testid="stSidebar"] {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    .main .block-container {
+        max-width: 1280px;
+        padding-top: 1rem;
+        padding-bottom: 2.5rem;
+        font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    .main h1 { font-weight: 650; letter-spacing: -0.03em; color: #0f172a; }
+    .main h2, .main h3 { font-weight: 600; letter-spacing: -0.02em; color: #0f172a; margin-top: 0.25rem; }
+    .main .stMarkdown p { line-height: 1.55; color: #334155; }
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #f1f5f9 0%, #f8fafc 100%);
+        border-right: 1px solid var(--retail-border);
+    }
+    section[data-testid="stSidebar"] .block-container { padding-top: 1.25rem; }
+    .sidebar-section-label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--retail-muted);
+        margin: 0 0 0.35rem 0;
+    }
+    div[data-testid="stExpander"] details {
+        border: 1px solid var(--retail-border) !important;
+        border-radius: 10px !important;
+        background: #ffffff !important;
+        margin-bottom: 0.5rem;
     }
     div[data-testid="stMetric"] {
-        background: linear-gradient(180deg, #fafafa 0%, #ffffff 100%);
-        border: 1px solid #eaeaea;
-        border-radius: 8px;
-        padding: 0.5rem 0.75rem;
-    }
-    button[data-testid="baseButton-primary"] { font-weight: 600; }
-    [data-testid="stVerticalBlock"] > div:has([data-testid="stPlotlyChart"]) {
+        background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+        border: 1px solid var(--retail-border);
         border-radius: 10px;
+        padding: 0.6rem 0.85rem;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+    div[data-testid="stMetric"] label { color: #64748b !important; font-size: 0.8rem !important; }
+    div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+        font-variant-numeric: tabular-nums;
+    }
+    button[data-testid="baseButton-primary"] {
+        font-weight: 600;
+        border-radius: 8px;
+        box-shadow: 0 1px 2px rgba(29, 78, 216, 0.25);
+    }
+    div[data-testid="stPlotlyChart"] {
+        border: 1px solid var(--retail-border);
+        border-radius: 12px;
+        background: #fff;
+        padding: 0.25rem;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+    }
+    /* Tabs: clearer affordance */
+    div[data-testid="stTabs"] [role="tablist"] {
+        gap: 0.35rem;
+        flex-wrap: wrap;
+        border-bottom: 1px solid var(--retail-border);
+        padding-bottom: 0.25rem;
+    }
+    div[data-testid="stTabs"] button[role="tab"] {
+        border-radius: 8px 8px 0 0;
+        font-weight: 500;
+        padding: 0.45rem 0.85rem;
+    }
+    /* Hero */
+    .retail-hero {
+        background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 48%, #ffffff 100%);
+        border: 1px solid var(--retail-border);
+        border-radius: 14px;
+        padding: 1.25rem 1.5rem 1.1rem 1.5rem;
+        margin-bottom: 0.5rem;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+    .retail-hero-title {
+        margin: 0 0 0.35rem 0;
+        font-size: 1.85rem;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        color: #0f172a;
+        line-height: 1.2;
+    }
+    .retail-hero-subtitle {
+        margin: 0;
+        font-size: 0.98rem;
+        color: #475569;
+        line-height: 1.45;
+        max-width: 52rem;
+    }
+    p.strip-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--retail-muted);
+        margin: 0 0 0.5rem 0;
     }
 </style>
 """
+
+
+def render_app_hero(st, *, title: str, subtitle: str) -> None:
+    """Top-of-page title block (styled via APP_STYLE `.retail-hero`)."""
+    st.markdown(
+        '<div class="retail-hero">'
+        f'<p class="retail-hero-title">{html.escape(title)}</p>'
+        f'<p class="retail-hero-subtitle">{html.escape(subtitle)}</p>'
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
 # English presenter “what to say” blocks — shown when “Show presenter hints” is enabled in the sidebar.
 # A detailed Hebrew walkthrough for the same flow lives in docs/presentation_personal_guide_he.md.

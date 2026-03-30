@@ -11,7 +11,7 @@
 1. **Overview** (2–3 דק׳) — היקף + סטטוס תפעולי + **תרשים Sankey**
 2. **KPIs & trends** (2–3 דק׳) — KPI, מגמה חודשית, ימי שבוע, מפת חום, התפלגות חשבוניות
 3. **Products** → **Customers** → **Countries** (3 דק׳ ביחד)
-4. **RFM & analytics class** (2 דק׳)
+4. **RFM & analytics** (2 דק׳)
 5. **Architecture** (1–2 דק׳)
 6. **Project summary** (1 דק׳)
 7. **Staging table** (אופציונלי, עד דקה)

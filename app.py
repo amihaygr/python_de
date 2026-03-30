@@ -25,6 +25,7 @@ from retail_etl.monitor import check_for_update
 from retail_etl.presentation import (
     APP_STYLE,
     project_root_from_app,
+    render_app_hero,
     render_architecture_presentation,
     render_presenter_hint,
     render_pipeline_sankey,
@@ -41,8 +42,12 @@ def _style_fig(fig, *, height: int = 430) -> None:
         template="plotly_white",
         height=height,
         colorway=_CHART_COLORWAY,
-        margin=dict(l=20, r=20, t=60, b=20),
+        margin=dict(l=20, r=20, t=56, b=20),
         hovermode="x unified",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="#fafafa",
+        font=dict(family="ui-sans-serif, system-ui, sans-serif", color="#334155"),
+        title=dict(font=dict(size=16, color="#0f172a")),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
 
@@ -159,9 +164,13 @@ def main() -> None:
     db_path = settings.db_path
     root = project_root_from_app(Path(__file__))
 
-    st.title("Retail sales intelligence")
-    st.caption(
-        "End-to-end pipeline: curated transactions in SQLite, interactive KPIs, and optional Kaggle refresh."
+    render_app_hero(
+        st,
+        title="Retail sales intelligence",
+        subtitle=(
+            "Governed path from raw CSV to SQLite: live KPIs, shared filters across tabs, "
+            "and optional Kaggle refresh with fingerprint checks."
+        ),
     )
 
     if not db_path.exists():
@@ -171,55 +180,57 @@ def main() -> None:
         )
         return
 
-    st.sidebar.header("Session")
-    view_mode = st.sidebar.radio(
-        "Presentation mode",
-        options=["Executive", "Technical"],
-        index=0,
-        help=(
-            "**Executive:** outcomes-first copy, lean technical detail. "
-            "**Technical:** expanded implementation notes and source code where relevant."
-        ),
-    )
+    st.sidebar.markdown('<p class="sidebar-section-label">Workspace</p>', unsafe_allow_html=True)
+    with st.sidebar.expander("Presentation", expanded=True):
+        view_mode = st.radio(
+            "Mode",
+            options=["Executive", "Technical"],
+            index=0,
+            horizontal=True,
+            help=(
+                "**Executive:** outcomes-first copy, lean technical detail. "
+                "**Technical:** expanded implementation notes and source code where relevant."
+            ),
+        )
+        show_presenter_hints = st.checkbox(
+            "Show presenter hints",
+            value=False,
+            help="English talking points per tab (expander). Hebrew guide: docs/presentation_personal_guide_he.md.",
+        )
     executive = view_mode == "Executive"
 
-    show_presenter_hints = st.sidebar.checkbox(
-        "Show presenter hints",
-        value=False,
-        help="English talking points per tab (expander). Detailed Hebrew script: docs/presentation_personal_guide_he.md.",
-    )
     if show_presenter_hints:
         st.markdown(
             "<style>.main .block-container { max-width: 1320px !important; }</style>",
             unsafe_allow_html=True,
         )
 
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("Data refresh (optional)")
-    dataset = st.sidebar.text_input(
-        "Kaggle dataset slug",
-        value=_default_kaggle_dataset(),
-        placeholder="owner/dataset from kaggle.com/datasets/…",
-        help=(
-            "Copy from the dataset URL after `/datasets/`. "
-            f"Project default: `{DEFAULT_RETAIL_KAGGLE_DATASET}`."
-        ),
-    )
-    if dataset.strip().lower() in {s.lower() for s in _KAGGLE_PLACEHOLDER_SLUGS}:
-        st.sidebar.warning(
-            "`owner/dataset-name` is only an example. Paste the real slug from Kaggle "
-            f"(this project defaults to `{DEFAULT_RETAIL_KAGGLE_DATASET}`)."
+    with st.sidebar.expander("Data source & refresh", expanded=False):
+        st.caption("Uses local `data/raw` by default; optionally pull from Kaggle with credentials.")
+        dataset = st.text_input(
+            "Kaggle dataset slug",
+            value=_default_kaggle_dataset(),
+            placeholder="owner/dataset from kaggle.com/datasets/…",
+            help=(
+                "Copy from the dataset URL after `/datasets/`. "
+                f"Project default: `{DEFAULT_RETAIL_KAGGLE_DATASET}`."
+            ),
         )
-    filename = st.sidebar.text_input("File name inside dataset", value=_default_kaggle_filename())
-    allow_incremental = st.sidebar.checkbox("Allow incremental load when safe", value=True)
-    download_from_kaggle = st.sidebar.checkbox(
-        "Download from Kaggle before fingerprint check",
-        value=False,
-        help=(
-            "Requires Kaggle credentials. If the raw CSV is missing, a download is attempted automatically; "
-            "check this box to overwrite an existing file under data/raw."
-        ),
-    )
+        if dataset.strip().lower() in {s.lower() for s in _KAGGLE_PLACEHOLDER_SLUGS}:
+            st.warning(
+                "`owner/dataset-name` is only an example. Paste the real slug from Kaggle "
+                f"(this project defaults to `{DEFAULT_RETAIL_KAGGLE_DATASET}`)."
+            )
+        filename = st.text_input("File name inside dataset", value=_default_kaggle_filename())
+        allow_incremental = st.checkbox("Allow incremental load when safe", value=True)
+        download_from_kaggle = st.checkbox(
+            "Download from Kaggle before fingerprint check",
+            value=False,
+            help=(
+                "Requires Kaggle credentials. If the raw CSV is missing, a download is attempted automatically; "
+                "check this box to overwrite an existing file under data/raw."
+            ),
+        )
 
     with st.spinner("Loading staging table…"):
         try:
@@ -231,36 +242,36 @@ def main() -> None:
         st.error("Staging table is empty; run refresh first.")
         return
 
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("Advanced slicers")
-    min_dt = staging_df["InvoiceDate"].min().date()
-    max_dt = staging_df["InvoiceDate"].max().date()
-    date_range = st.sidebar.date_input(
-        "Invoice date range",
-        value=(min_dt, max_dt),
-        min_value=min_dt,
-        max_value=max_dt,
-    )
-    if isinstance(date_range, tuple) and len(date_range) == 2:
-        from_date, to_date = date_range
-    else:
-        from_date, to_date = min_dt, max_dt
+    with st.sidebar.expander("Scope filters", expanded=True):
+        st.caption("Shared across all tabs. Pick at least one country, or widen the date range.")
+        min_dt = staging_df["InvoiceDate"].min().date()
+        max_dt = staging_df["InvoiceDate"].max().date()
+        date_range = st.date_input(
+            "Invoice date range",
+            value=(min_dt, max_dt),
+            min_value=min_dt,
+            max_value=max_dt,
+        )
+        if isinstance(date_range, tuple) and len(date_range) == 2:
+            from_date, to_date = date_range
+        else:
+            from_date, to_date = min_dt, max_dt
 
-    country_options = sorted([c for c in staging_df["Country"].dropna().unique().tolist() if c])
-    selected_countries = st.sidebar.multiselect(
-        "Countries",
-        options=country_options,
-        default=country_options,
-    )
-    max_line_total = float(staging_df["line_total"].quantile(0.99)) if not staging_df.empty else 0.0
-    min_line_total = st.sidebar.slider(
-        "Minimum line total",
-        min_value=0.0,
-        max_value=max(max_line_total, 1.0),
-        value=0.0,
-        step=1.0,
-    )
-    product_search = st.sidebar.text_input("Product contains", value="").strip().lower()
+        country_options = sorted([c for c in staging_df["Country"].dropna().unique().tolist() if c])
+        selected_countries = st.multiselect(
+            "Countries",
+            options=country_options,
+            default=country_options,
+        )
+        max_line_total = float(staging_df["line_total"].quantile(0.99)) if not staging_df.empty else 0.0
+        min_line_total = st.slider(
+            "Minimum line total",
+            min_value=0.0,
+            max_value=max(max_line_total, 1.0),
+            value=0.0,
+            step=1.0,
+        )
+        product_search = st.text_input("Product contains", value="", placeholder="Substring in description…").strip().lower()
 
     filtered_df = staging_df[
         (staging_df["InvoiceDate"].dt.date >= from_date)
@@ -331,6 +342,14 @@ def main() -> None:
 
     analytics = RetailAnalytics(db_path)
 
+    st.markdown('<p class="strip-label">Filtered scope (all tabs)</p>', unsafe_allow_html=True)
+    sc1, sc2, sc3, sc4 = st.columns(4)
+    sc1.metric("Rows", f"{len(filtered_df):,}")
+    sc2.metric("Invoices", f"{filtered_df['InvoiceNo'].nunique():,}")
+    sc3.metric("Customers", f"{filtered_df['CustomerID'].nunique():,}")
+    sc4.metric("Countries selected", len(selected_countries))
+    st.divider()
+
     (
         tab_intro,
         tab_overview,
@@ -348,7 +367,7 @@ def main() -> None:
             "Products",
             "Customers",
             "Countries",
-            "RFM & analytics class",
+            "RFM & analytics",
             "Architecture",
             "Project summary",
             "Staging table",
@@ -389,9 +408,7 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
         c3.metric("Countries", f"{info['countries']:,}")
         c4.metric("Date range", f"{info['min_date']} → {info['max_date']}")
         st.caption(
-            f"Slicer result: **{len(filtered_df):,}** rows · "
-            f"{filtered_df['InvoiceNo'].nunique():,} invoices · "
-            f"{filtered_df['CustomerID'].nunique():,} customers."
+            "Same filtered grain as the **Filtered scope** bar above — full-database counts are the four headline metrics."
         )
 
         st.subheader("Operational status")

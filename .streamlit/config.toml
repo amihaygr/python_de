@@ -7,4 +7,10 @@ enableXsrfProtection = true
 gatherUsageStats = false
 
 [theme]
+# Cohesive slate + indigo palette (matches dashboard charts)
 base = "light"
+primaryColor = "#1d4ed8"
+backgroundColor = "#f8fafc"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#0f172a"
+font = "sans serif"

@@ -67,6 +67,17 @@ This keeps ETL rules, SQL, monitoring, and UI independent and maintainable.
 6. Record metadata, runs, and alerts in `meta_*`.
 7. Serve dashboards and exports.
 
+### Marts vs `meta_*` tables (the “split” after staging)
+
+After **`stg_sales_clean`**, the pipeline conceptually forks into two kinds of SQLite tables:
+
+| Layer | Prefix / examples | What it holds | Purpose |
+|--------|-------------------|---------------|---------|
+| **Marts** | `mart_sales_monthly`, `mart_product_summary`, `mart_customer_summary`, `mart_country_summary` | **Business aggregates** built from staging (revenue, units, counts by month / product / customer / country). | Ready-made **analytics** for reports, exports, and charts that match classic BI grain. |
+| **Meta** | `meta_source_state`, `meta_schema_state`, `meta_pipeline_runs`, `meta_alerts`, … | **Operational metadata**: source file fingerprint, schema snapshot, ETL run history, active alerts. | **Observability** — prove what was loaded, when, and whether anything failed or drifted. |
+
+Neither replaces the other: **marts** answer “what do the numbers say?”; **meta** answers “how did we load them and are we healthy?”. The Streamlit **Overview** tab reads both (KPI-style data from staging/marts logic, and status from meta).
+
 ---
 
 ## 4) Dynamic analysis (advanced slicers)

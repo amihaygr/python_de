@@ -44,7 +44,7 @@ PRESENTER_HINTS: dict[str, str] = {
 3. **Operational status** — last successful refresh, run mode, alert count. Say: “A successful check is recorded even when data did not change — so the timestamp updates.”
 4. **Fingerprint / SHA** — Say: “You can defend auditability against the raw file.”
 5. **Run refresh check** — Say: “This triggers monitoring against Kaggle/CSV: fingerprint, schema, controlled load.”
-6. **Sankey diagram (below)** — Say: “Numbered stages ①–⑦, light nodes and dark text for readability; same story as the slide/doc — E→T→L, then split into marts vs meta before the dashboard.”
+6. **Sankey diagram (below)** — Say: “After staging, **marts** (`mart_*`) hold **business aggregates** (revenue by month/product/etc.); **meta** (`meta_*`) holds **pipeline observability** (fingerprints, runs, alerts). The dashboard uses both: charts from analytics/staging, status from meta.”
 """,
     "kpis": """
 **Goal:** Trends, seasonality, and distributions — *in the filtered context*.
@@ -195,8 +195,10 @@ def render_pipeline_sankey(st, *, colorway: list[str] | None = None) -> None:
     )
     st.plotly_chart(fig, width="stretch")
     st.caption(
-        "Flows are **even widths** (illustrative). Read the **numbered** stages left → right; staging splits into "
-        "**marts** vs **meta**, then both feed the dashboard."
+        "Flows are **even widths** (illustrative). After staging, the fork is: **Marts** = aggregated business facts "
+        "(`mart_*`, e.g. revenue by month/product/customer/country). **Meta** = pipeline observability "
+        "(`meta_*`: fingerprints, runs, alerts). Both are written in SQLite; the dashboard uses marts/analytics for "
+        "charts and meta for operational status."
     )
 
 

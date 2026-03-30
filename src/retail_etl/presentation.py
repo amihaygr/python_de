@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import plotly.graph_objects as go
+
 # Subtle, presentation-friendly styling (LTR, English UI)
 APP_STYLE = """
 <style>
@@ -23,8 +25,158 @@ APP_STYLE = """
         border-radius: 8px;
         padding: 0.5rem 0.75rem;
     }
+    button[data-testid="baseButton-primary"] { font-weight: 600; }
+    [data-testid="stVerticalBlock"] > div:has([data-testid="stPlotlyChart"]) {
+        border-radius: 10px;
+    }
 </style>
 """
+
+# Hebrew “what to say” blocks — shown when “Show Hebrew presenter hints” is enabled in the sidebar.
+# Mirrors docs/presentation_personal_guide_he.md (keep in sync when changing demo flow).
+PRESENTER_HINTS_HE: dict[str, str] = {
+    "intro": """
+**מטרה:** להראות שהמערכת *מנוהלת* — לא רק גרפים, אלא גם מקור, ריצות, והתראות.
+
+**מה להצביע עליו בזה אחר זה**
+1. **ארבעת המטריקות למעלה** — היקף נתונים אחרי ניקוי (שורות, לקוחות, מדינות, טווח תאריכים). אמור: “זה ה־grain שעליו כל שאר הדוחות בנויים”.
+2. **שורת “Slicer result”** — מסבירה כמה שורות נשארו אחרי הסינון בצד. אמור: “כל מה שאראה מעכשיו מכבד את אותם פילטרים — בלי להריץ מחדש ETL”.
+3. **Operational status** — “Last successful refresh”, מצב ריצה, מספר alerts. אמור: “גם אם הנתונים לא השתנו, בדיקה מוצלחת נרשמת — לכן התאריך מתעדכן”.
+4. **טביעת אצבע / SHA** — אמור: “אפשר להוכיח בביקורת שמקור הקובץ זהה למה שטענו”.
+5. **כפתור Run refresh check** — אמור: “כאן מפעילים ניטור מול Kaggle/CSV: fingerprint, סכימה, וטעינה מבוקרת”.
+6. **תרשים הזרימה (Sankey) למטה** — אמור: “זה אותו תרשים לוגי שמופיע במסמך ההצגה — רק כאן הוא חי ואפשר להצמיד אותו לסיפור E→T→L”.
+""",
+    "kpis": """
+**מטרה:** להראות מגמות, עונתיות, והתפלגות — *בהקשר המסונן*.
+
+**לפי סדר המסך**
+1. **Headline metrics** — Total revenue / Units / Invoices ואז ממוצעים. אמור: “אלה KPIים עסקיים ישירים מה־staging המסונן”.
+2. **Monthly revenue** — קו מגמה + ממוצע נע 3 חודשים. אמור: “רואים עונתיות ושבירות אם עדכנו נתונים”.
+3. **Revenue by weekday** — אמור: “מזהים ימים חזקים לקמפיינים ולוגיסטיקה”.
+4. **Shopping rhythm (heatmap)** — אמור: “מפת חום weekday×שעה: במצב מוחלט — כסף; במצב אחוזים — *צורת היום* גם כשההכנסה הכוללת שונה; שעות עסקים מזמינים את הקהל לחלון הרלוונטי”.
+5. **Invoice size distribution** — היסטוגרמה + box. אמור: “רואים אם יש עסקאות ‘ענק’ נדירות או עקביות — חשוב לסיכון אשראי/הנחות”.
+""",
+    "products": """
+**מטרה:** ריכוזיות מוצרים (Pareto).
+
+**מה להגיד**
+- “בר גרף אופקי של Top N מוצרים לפי revenue”. שנה את **Top N** כדי להראות גמישות.
+- “אם כמה מוצרים שולטים בהכנסות — יש תלות במלאי ובמחסן; אם התפלגות שטוחה — פורטפוליו מגוון”.
+- אם מצב **Technical**: “הטבלה למטה מראה את אותם מספרים בצורה מדויקת”.
+""",
+    "customers": """
+**מטרה:** ריכוזיות לקוחות וסיכון ריכוז.
+
+**מה להגיד**
+- “אותו סלייסר גלובלי — אז ההשוואה לטאב מוצרים עקבית”.
+- “לקוחות בראש הרשימה דורשים שימור; שים לב אם יש לקוח בודד עם נתח חריג”.
+- “מקשרים לטאב RFM לפעולות שיווק ממוקדות”.
+""",
+    "countries": """
+**מטרה:** גיאוגרפיה ונתח שוק.
+
+**מה להגיד**
+- **Treemap** — “גודל המלבן ∝ הכנסה; צבע מחזק את ההבדל”.
+- “בדאטה הזה UK לרוב דומיננטי — אפשר לשאול מה הפוטנציאל בחו״ל”.
+- שנה **Top N** כדי להראות עומק גיאוגרפי.
+""",
+    "rfm": """
+**מטרה:** סגמנטציה לפי Recency / Frequency / Monetary — *על הנתונים המסוננים*.
+
+**מה להגיד**
+1. **הסליידרים** — “מצמצמים לקוחות רלוונטיים: לא ישנים מדי, לא חד־פעמיים מדי, לא זניחים כספית”.
+2. **גרף עמודות סגמנטים** — “איזה קודי RFM הכי מייצגים את הבייס”.
+3. **בועות** — “ציר X רצות ימים מאז רכישה אחרונה, Y תדירות, גודל בועה = כסף”.
+4. “הלוגיקה בקוד נשארת ב־`RetailAnalytics` / פונקציות עזר — ה־UI נשאר דק”.
+""",
+    "arch": """
+**מטרה:** שקיפות הנדסית — מבנה תיקיות, SQL חיצוני, בדיקות.
+
+**מה להגיד**
+- “מפרידים UI מלוגיקה: `app.py` מציג, `retail_etl` מבצע”.
+- “כל שאילתה דינמית עוברת allowlist; SQL בקבצים לתחזוקה”.
+- פתח expander אחד כדוגמה: “כך מאשרים שינוי בקוד בלי לחפש מחרוזות בפייתון”.
+""",
+    "summary": """
+**מטרה:** סגירה מהירה — value proposition.
+
+**מה להגיד**
+- **Executive:** “מסלול אחד מנוהל מקובץ גולמי לדוחות שאפשר להגן עליהם בפגישת הנהלה”.
+- **Technical:** “Docker, pytest, מטא־דאטה, CLI — מוכן לסביבת קורס/POC ולהרחבה עתידית”.
+""",
+    "staging": """
+**מטרה:** הוכחת grain וחוזה נתונים.
+
+**מה להגיד**
+- “כל שורה = שורת חשבונית; `line_total` הוא פיצ’ר מחושב ב־ETL”.
+- “התצוגה מכבדת slicers — אותה לוגיקה כמו בגרפים”.
+- “אם שואלים על ניקוי — להפנות ל־`CleanConfig` ולסינון כמויות/מחירים”.
+""",
+}
+
+
+def render_hebrew_presenter_hint(st, tab_key: str, *, enabled: bool) -> None:
+    """Expandable Hebrew script for live demos (see PRESENTER_HINTS_HE)."""
+    if not enabled:
+        return
+    body = PRESENTER_HINTS_HE.get(tab_key)
+    if not body:
+        return
+    with st.expander("מה להגיד עכשיו · עברית (טקסט להצגה)", expanded=False):
+        st.markdown(body)
+
+
+def render_pipeline_sankey(st, *, colorway: list[str] | None = None) -> None:
+    """Interactive pipeline diagram (same logical story as the Mermaid diagram in the presentation doc)."""
+    colors = colorway or [
+        "#1D4ED8",
+        "#0EA5E9",
+        "#14B8A6",
+        "#22C55E",
+        "#F59E0B",
+        "#A855F7",
+        "#64748B",
+    ]
+    labels = [
+        "Kaggle / local CSV",
+        "Ingest + fingerprint",
+        "clean_sales (Pandas)",
+        "stg_sales_clean",
+        "Mart tables",
+        "Meta (runs / alerts)",
+        "Streamlit + Plotly",
+    ]
+    # Logical flow: linear ETL + parallel observability into the dashboard
+    source = [0, 1, 2, 3, 3, 4, 5]
+    target = [1, 2, 3, 4, 5, 6, 6]
+    value = [10, 10, 10, 10, 10, 10, 10]
+    fig = go.Figure(
+        data=[
+            go.Sankey(
+                arrangement="snap",
+                node=dict(
+                    pad=18,
+                    thickness=20,
+                    line=dict(color="rgba(0,0,0,0.35)", width=0.5),
+                    label=labels,
+                    color=colors[: len(labels)],
+                ),
+                link=dict(source=source, target=target, value=value),
+            )
+        ]
+    )
+    fig.update_layout(
+        title=dict(text="Data pipeline — logical flow (matches presentation guide)", font=dict(size=15)),
+        height=440,
+        margin=dict(l=10, r=10, t=50, b=10),
+        font=dict(family="Arial, sans-serif", size=12),
+        paper_bgcolor="#fafafa",
+    )
+    st.plotly_chart(fig, width="stretch")
+    st.caption(
+        "Sankey widths are illustrative (equal flow). The important part is the **sequence** and the split into "
+        "**marts** vs **metadata** before the dashboard."
+    )
 
 
 def project_root_from_app(app_file: Path) -> Path:

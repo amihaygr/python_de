@@ -144,6 +144,8 @@ def check_for_update(
 
         changed = fp.sha256 != prev["sha256"] or fp.size_bytes != prev["size_bytes"]
         if not changed:
+            # Keep `updated_at` as "last checked" so the dashboard reflects successful refresh checks.
+            upsert_source_state(conn, dataset, filename, fp.size_bytes, fp.sha256)
             logger.debug("No change detected for %s (sha256 unchanged).", csv_path)
             return {"action": "noop", "changed": False}
 

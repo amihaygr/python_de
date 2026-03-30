@@ -299,25 +299,25 @@ def main() -> None:
 
     (
         tab_intro,
-        tab_arch,
         tab_overview,
         tab_products,
         tab_customers,
         tab_countries,
         tab_deep,
-        tab_table,
+        tab_arch,
         tab_explain,
+        tab_table,
     ) = st.tabs(
         [
             "Overview",
-            "Architecture",
             "KPIs & trends",
             "Products",
             "Customers",
             "Countries",
             "RFM & analytics class",
-            "Staging table",
+            "Architecture",
             "Project summary",
+            "Staging table",
         ]
     )
 
@@ -381,7 +381,7 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
             sha = source_state.get("sha256") or "—"
             st.caption(
                 f"Source fingerprint: `{sha[:16]}…` · {source_state.get('size_bytes')} bytes · "
-                f"last updated (Israel): **{format_utc_iso_as_israel(source_state.get('updated_at'))}**"
+                f"last check time (Israel): **{format_utc_iso_as_israel(source_state.get('updated_at'))}**"
             )
 
         if alerts:

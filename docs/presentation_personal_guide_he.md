@@ -1,4 +1,8 @@
+<div dir="rtl" lang="he">
+
 # מדריך אישי להצגת פרויקט Retail ETL (מפורט)
+
+> **קריאה דו־לשונית (עברית + אנגלית):** רוב המסמך בעברית, יישור לימין (RTL). מונחים טכניים באנגלית (`ETL`, `Streamlit`, `SQLite` וכו׳) נשארים בכיוון **שמאל־ימין (LTR)** בתוך המשפט. בלוק **Mermaid** למטה מוצג ב־LTR כדי שהחיצים והתוויות יהיו קריאים.
 
 > **סנכרון עם האפליקציה:** ב־Streamlit, בסרגל הצד, סמן **Show presenter hints** — בכל טאב יופיע Expander **באנגלית** (אותו סדר נושאים כמו במדריך הזה). המדריך בעברית כאן הוא הרחבה מפורטת להצגה חיה. התרשים האינטראקטיבי (Sankey) בטאב **Overview** תחת "Pipeline at a glance". מקור הקוד: `PRESENTER_HINTS` ב־`src/retail_etl/presentation.py`.
 
@@ -96,6 +100,10 @@
 
 ### תרשים Mermaid (במסמך — לשקופית / README)
 
+</div>
+
+<div dir="ltr" lang="en">
+
 ```mermaid
 flowchart LR
     A[Kaggle / local CSV] --> B[Ingestion + fingerprint]
@@ -106,6 +114,10 @@ flowchart LR
     D --> G[meta tables: runs/alerts/state]
     G --> F
 ```
+
+</div>
+
+<div dir="rtl" lang="he">
 
 - **אם שואלים למה שני תרשימים:** "באפליקציה תרשים אחד חי לדמו; ב־Markdown תרשים מקובע לשקופית."
 
@@ -234,3 +246,5 @@ flowchart LR
 ## תסריט סיום (15–20 שניות)
 
 "קיבלנו תשתית אנליטית עם SQL מופרד, ETL אמין, dashboard דינמי, וניטור שינויים — מתאים להצגה עסקית ולשקיפות הנדסית."
+
+</div>

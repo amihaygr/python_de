@@ -1,4 +1,7 @@
-"""Dashboard presentation copy and architecture walkthrough (English, LTR)."""
+"""Dashboard presentation copy and architecture walkthrough.
+
+English UI by default; Hebrew RTL blocks (`retail-rtl-block`) for bilingual presenter notes.
+"""
 
 from __future__ import annotations
 
@@ -25,6 +28,24 @@ APP_STYLE = """
     .main h1:not(.retail-hero-title) { font-weight: 650; letter-spacing: -0.03em; color: #0f172a; }
     .main h2, .main h3 { font-weight: 600; letter-spacing: -0.02em; color: #0f172a; margin-top: 0.25rem; }
     .main .stMarkdown p { line-height: 1.55; color: #334155; }
+    /* Hebrew RTL + English/code LTR (bilingual presenter / docs) */
+    .retail-rtl-block {
+        direction: rtl;
+        text-align: right;
+        unicode-bidi: plaintext;
+        font-family: "Segoe UI", "Arial Hebrew", "David", "Noto Sans Hebrew", system-ui, sans-serif;
+        line-height: 1.65;
+        color: #334155;
+        margin-bottom: 0.75rem;
+    }
+    .retail-rtl-block p { text-align: right; margin: 0.35em 0; }
+    .retail-rtl-block code,
+    .retail-rtl-block .retail-ltr-inline {
+        direction: ltr;
+        unicode-bidi: isolate;
+        text-align: left;
+        font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    }
     section[data-testid="stSidebar"] {
         background: linear-gradient(180deg, #f1f5f9 0%, #f8fafc 100%);
         border-right: 1px solid var(--retail-border);
@@ -277,6 +298,14 @@ def render_presenter_hint(st, tab_key: str, *, enabled: bool) -> None:
     body = PRESENTER_HINTS.get(tab_key)
     if not body:
         return
+    st.markdown(
+        '<div class="retail-rtl-block" dir="rtl" lang="he">'
+        "<strong>מציג:</strong> הרמזים בפנים באנגלית (LTR). "
+        "מדריך מלא בעברית עם מילון מושגים: "
+        '<span class="retail-ltr-inline"><code>docs/presentation_personal_guide_he.md</code></span>.'
+        "</div>",
+        unsafe_allow_html=True,
+    )
     with st.expander("Presenter hints — what to say (English)", expanded=False):
         st.markdown(body)
 
@@ -364,6 +393,16 @@ def project_root_from_app(app_file: Path) -> Path:
 
 def render_architecture_presentation(st, root: Path, *, executive_mode: bool) -> None:
     """Step-by-step architecture: folders, modules, optional deep SQL."""
+    st.markdown(
+        '<div class="retail-rtl-block" dir="rtl" lang="he">'
+        "<p><strong>ארכיטקטורה — קריאה דו־לשונית:</strong> "
+        "הסעיפים למטה <em>באנגלית</em> (כיוון שמאל־ימין) — פירוט טכני. "
+        "שמות קבצים ומודולים באנגלית נשמרים בכיוון LTR בתוך הפסקה.</p>"
+        "<p>למצגת בעברית מלאה (RTL) עם תרשים Mermaid ב־LTR — "
+        '<span class="retail-ltr-inline"><code>docs/presentation_personal_guide_he.md</code></span>.</p>'
+        "</div>",
+        unsafe_allow_html=True,
+    )
     st.markdown(
         """
 ### Solution architecture

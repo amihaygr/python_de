@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import sqlite3
 import streamlit as st
 
@@ -22,6 +23,18 @@ from retail_etl.settings import DEFAULT_RETAIL_KAGGLE_DATASET, DEFAULT_RETAIL_KA
 from retail_etl.utils import configure_logging
 
 _KAGGLE_PLACEHOLDER_SLUGS = frozenset({"owner/dataset-name"})
+_CHART_COLORWAY = ["#1D4ED8", "#0EA5E9", "#14B8A6", "#22C55E", "#F59E0B", "#EF4444", "#A855F7"]
+
+
+def _style_fig(fig, *, height: int = 430) -> None:
+    fig.update_layout(
+        template="plotly_white",
+        height=height,
+        colorway=_CHART_COLORWAY,
+        margin=dict(l=20, r=20, t=60, b=20),
+        hovermode="x unified",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    )
 
 
 def _default_kaggle_dataset() -> str:
@@ -452,15 +465,25 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
         col8.metric("Distinct SKUs", f"{int(filtered_kpis['products']):,}")
 
         st.subheader("Monthly revenue")
-        fig = px.line(
+        fig = px.area(
             monthly_filtered,
             x="year_month",
             y="revenue",
             title="Revenue by month",
             labels={"year_month": "Month", "revenue": "Revenue"},
         )
-        fig.update_layout(template="plotly_white", height=420)
-        st.plotly_chart(fig, use_container_width=True)
+        rolling = monthly_filtered["revenue"].rolling(window=3, min_periods=1).mean()
+        fig.add_trace(
+            go.Scatter(
+                x=monthly_filtered["year_month"],
+                y=rolling,
+                mode="lines+markers",
+                name="3-month trend",
+                line=dict(width=3, color="#1E293B"),
+            )
+        )
+        _style_fig(fig, height=430)
+        st.plotly_chart(fig, width="stretch")
         if executive:
             st.info("**Executive read:** trend and seasonality drive inventory and campaign timing—watch peaks and troughs.")
         else:
@@ -473,9 +496,13 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
             y="revenue",
             title="Revenue by weekday",
             labels={"weekday": "Weekday", "revenue": "Revenue"},
+            color="revenue",
+            color_continuous_scale="Blues",
+            text_auto=".2s",
         )
-        weekday_fig.update_layout(template="plotly_white", height=420)
-        st.plotly_chart(weekday_fig, use_container_width=True)
+        _style_fig(weekday_fig, height=420)
+        weekday_fig.update_traces(textposition="outside")
+        st.plotly_chart(weekday_fig, width="stretch")
         if not weekday_filtered.empty:
             best = weekday_filtered.sort_values("revenue", ascending=False).iloc[0]
             st.caption(f"Top weekday: **{best['weekday']}** → {best['revenue']:,.0f} revenue.")
@@ -487,9 +514,11 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
             nbins=40,
             title="Revenue per invoice",
             labels={"invoice_revenue": "Invoice revenue"},
+            color_discrete_sequence=["#1D4ED8"],
+            marginal="box",
         )
-        hist_fig.update_layout(template="plotly_white", height=420)
-        st.plotly_chart(hist_fig, use_container_width=True)
+        _style_fig(hist_fig, height=420)
+        st.plotly_chart(hist_fig, width="stretch")
         if not invoice_totals.empty:
             q50 = float(invoice_totals["invoice_revenue"].quantile(0.5))
             q90 = float(invoice_totals["invoice_revenue"].quantile(0.9))
@@ -502,13 +531,18 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
         top_products = products_filtered.head(top_n)
         fig = px.bar(
             top_products,
-            x="Description",
-            y="revenue",
+            x="revenue",
+            y="Description",
             title=f"Top {top_n} products",
             labels={"Description": "Product", "revenue": "Revenue"},
+            orientation="h",
+            color="revenue",
+            color_continuous_scale="Tealgrn",
+            text_auto=".2s",
         )
-        fig.update_layout(template="plotly_white", xaxis_tickangle=-45, height=500)
-        st.plotly_chart(fig, use_container_width=True)
+        fig.update_yaxes(categoryorder="total ascending")
+        _style_fig(fig, height=520)
+        st.plotly_chart(fig, width="stretch")
         if not executive:
             st.dataframe(top_products, use_container_width=True, hide_index=True)
         if executive:
@@ -522,13 +556,18 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
         top_customers = customers_filtered.head(top_n_c)
         fig = px.bar(
             top_customers,
-            x="CustomerID",
-            y="revenue",
+            x="revenue",
+            y=top_customers["CustomerID"].astype(str),
             title=f"Top {top_n_c} customers",
             labels={"CustomerID": "Customer ID", "revenue": "Revenue"},
+            orientation="h",
+            color="revenue",
+            color_continuous_scale="Purples",
+            text_auto=".2s",
         )
-        fig.update_layout(template="plotly_white", height=450)
-        st.plotly_chart(fig, use_container_width=True)
+        fig.update_yaxes(title="Customer ID", categoryorder="total ascending")
+        _style_fig(fig, height=500)
+        st.plotly_chart(fig, width="stretch")
         if not executive:
             st.dataframe(top_customers, use_container_width=True, hide_index=True)
         if executive:
@@ -540,15 +579,16 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
         st.subheader("Top countries by revenue")
         top_n_co = st.slider("Top N", min_value=5, max_value=30, value=10, step=5, key="co")
         top_countries = countries_filtered.head(top_n_co)
-        fig = px.bar(
+        fig = px.treemap(
             top_countries,
-            x="Country",
-            y="revenue",
+            path=["Country"],
+            values="revenue",
             title=f"Top {top_n_co} countries",
-            labels={"Country": "Country", "revenue": "Revenue"},
+            color="revenue",
+            color_continuous_scale="Blues",
         )
-        fig.update_layout(template="plotly_white", xaxis_tickangle=-45, height=500)
-        st.plotly_chart(fig, use_container_width=True)
+        _style_fig(fig, height=520)
+        st.plotly_chart(fig, width="stretch")
         if not executive:
             st.dataframe(top_countries, use_container_width=True, hide_index=True)
         if executive:
@@ -629,9 +669,27 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
             y="customers",
             title="Largest RFM segments (by customer count)",
             labels={"rfm_segment": "RFM segment", "customers": "Customers"},
+            color="avg_monetary",
+            color_continuous_scale="Turbo",
+            text_auto=True,
         )
-        seg_fig.update_layout(template="plotly_white", height=420, xaxis_tickangle=-45)
-        st.plotly_chart(seg_fig, use_container_width=True)
+        seg_fig.update_layout(xaxis_tickangle=-45)
+        _style_fig(seg_fig, height=440)
+        st.plotly_chart(seg_fig, width="stretch")
+
+        bubble = px.scatter(
+            rfm_df,
+            x="recency_days",
+            y="frequency",
+            size="monetary",
+            color="rfm_segment",
+            title="RFM bubble map (Recency vs Frequency, bubble size = Monetary)",
+            labels={"recency_days": "Recency (days)", "frequency": "Frequency"},
+            hover_data={"CustomerID": True, "monetary": ":.2f"},
+            size_max=35,
+        )
+        _style_fig(bubble, height=460)
+        st.plotly_chart(bubble, width="stretch")
 
         best = rfm_df.sort_values("monetary", ascending=False).head(1).iloc[0]
         st.caption(

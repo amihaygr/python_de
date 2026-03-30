@@ -746,6 +746,7 @@ The UI stays thin; quantitative logic lives in **`src/retail_etl/analytics.py`**
 | `get_revenue_by_weekday()` | Weekday seasonality |
 | `get_invoice_revenue_distribution()` | Invoice-level histogram input |
 | `get_rfm(q=5)` | Segmentation with quantile bins |
+| `weekday_hour_revenue_pivot(df)` | Weekday × hour revenue matrix (heatmap input) |
 """
             )
             st.divider()

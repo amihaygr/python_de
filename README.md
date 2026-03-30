@@ -180,7 +180,7 @@ Primary tabs:
 - Project summary
 - Staging table
 
-**Presenter mode:** in the sidebar, enable **Show Hebrew presenter hints** to open a Hebrew “what to say” expander on each tab (aligned with `docs/presentation_personal_guide_he.md`). On **Overview**, the interactive **Sankey** pipeline diagram mirrors the flowchart story from the presentation doc.
+**Presenter mode:** in the sidebar, enable **Show presenter hints** for an English “what to say” expander on each tab (same flow as the Hebrew guide `docs/presentation_personal_guide_he.md` and code in `PRESENTER_HINTS` in `presentation.py`). On **Overview**, the interactive **Sankey** pipeline diagram mirrors the flowchart story from the presentation doc.
 
 ---
 

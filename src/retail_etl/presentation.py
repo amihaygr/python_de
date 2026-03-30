@@ -32,97 +32,97 @@ APP_STYLE = """
 </style>
 """
 
-# Hebrew “what to say” blocks — shown when “Show Hebrew presenter hints” is enabled in the sidebar.
-# Mirrors docs/presentation_personal_guide_he.md (keep in sync when changing demo flow).
-PRESENTER_HINTS_HE: dict[str, str] = {
+# English presenter “what to say” blocks — shown when “Show presenter hints” is enabled in the sidebar.
+# A detailed Hebrew walkthrough for the same flow lives in docs/presentation_personal_guide_he.md.
+PRESENTER_HINTS: dict[str, str] = {
     "intro": """
-**מטרה:** להראות שהמערכת *מנוהלת* — לא רק גרפים, אלא גם מקור, ריצות, והתראות.
+**Goal:** Show the system is *governed* — not only charts, but source, runs, and alerts.
 
-**מה להצביע עליו בזה אחר זה**
-1. **ארבעת המטריקות למעלה** — היקף נתונים אחרי ניקוי (שורות, לקוחות, מדינות, טווח תאריכים). אמור: “זה ה־grain שעליו כל שאר הדוחות בנויים”.
-2. **שורת “Slicer result”** — מסבירה כמה שורות נשארו אחרי הסינון בצד. אמור: “כל מה שאראה מעכשיו מכבד את אותם פילטרים — בלי להריץ מחדש ETL”.
-3. **Operational status** — “Last successful refresh”, מצב ריצה, מספר alerts. אמור: “גם אם הנתונים לא השתנו, בדיקה מוצלחת נרשמת — לכן התאריך מתעדכן”.
-4. **טביעת אצבע / SHA** — אמור: “אפשר להוכיח בביקורת שמקור הקובץ זהה למה שטענו”.
-5. **כפתור Run refresh check** — אמור: “כאן מפעילים ניטור מול Kaggle/CSV: fingerprint, סכימה, וטעינה מבוקרת”.
-6. **תרשים הזרימה (Sankey) למטה** — אמור: “שלבים ממוספרים ①–⑦, רקע בהיר וטקסט כהה לקריאה מרחוק; אותו סיפור כמו במסמך ההצגה — E→T→L ופיצול ל־marts מול meta לפני הדשבורד”.
+**Walk through in order**
+1. **Four headline metrics** — scope after cleaning (rows, customers, countries, date range). Say: “This is the grain every downstream chart uses.”
+2. **“Slicer result” line** — how many rows remain after sidebar filters. Say: “Everything from here on respects the same filters — no ETL rerun.”
+3. **Operational status** — last successful refresh, run mode, alert count. Say: “A successful check is recorded even when data did not change — so the timestamp updates.”
+4. **Fingerprint / SHA** — Say: “You can defend auditability against the raw file.”
+5. **Run refresh check** — Say: “This triggers monitoring against Kaggle/CSV: fingerprint, schema, controlled load.”
+6. **Sankey diagram (below)** — Say: “Numbered stages ①–⑦, light nodes and dark text for readability; same story as the slide/doc — E→T→L, then split into marts vs meta before the dashboard.”
 """,
     "kpis": """
-**מטרה:** להראות מגמות, עונתיות, והתפלגות — *בהקשר המסונן*.
+**Goal:** Trends, seasonality, and distributions — *in the filtered context*.
 
-**לפי סדר המסך**
-1. **Headline metrics** — Total revenue / Units / Invoices ואז ממוצעים. אמור: “אלה KPIים עסקיים ישירים מה־staging המסונן”.
-2. **Monthly revenue** — קו מגמה + ממוצע נע 3 חודשים. אמור: “רואים עונתיות ושבירות אם עדכנו נתונים”.
-3. **Revenue by weekday** — אמור: “מזהים ימים חזקים לקמפיינים ולוגיסטיקה”.
-4. **Shopping rhythm (heatmap)** — אמור: “מפת חום weekday×שעה: במצב מוחלט — כסף; במצב אחוזים — *צורת היום* גם כשההכנסה הכוללת שונה; שעות עסקים מזמינים את הקהל לחלון הרלוונטי”.
-5. **Invoice size distribution** — היסטוגרמה + box. אמור: “רואים אם יש עסקאות ‘ענק’ נדירות או עקביות — חשוב לסיכון אשראי/הנחות”.
+**In screen order**
+1. **Headline metrics** — Total revenue / Units / Invoices, then averages. Say: “Direct business KPIs from filtered staging.”
+2. **Monthly revenue** — Area + 3-month rolling trend. Say: “Seasonality and any break when data was refreshed.”
+3. **Revenue by weekday** — Say: “Strong days for campaigns and operations.”
+4. **Shopping rhythm (heatmap)** — Say: “Weekday × hour: absolute mode = money; % mode = *intraday shape* even when totals differ; business-hours zooms the x-axis.”
+5. **Invoice size distribution** — Histogram + box. Say: “Tail risk for large invoices — relevant for discounts and credit policy.”
 """,
     "products": """
-**מטרה:** ריכוזיות מוצרים (Pareto).
+**Goal:** Product concentration (Pareto).
 
-**מה להגיד**
-- “בר גרף אופקי של Top N מוצרים לפי revenue”. שנה את **Top N** כדי להראות גמישות.
-- “אם כמה מוצרים שולטים בהכנסות — יש תלות במלאי ובמחסן; אם התפלגות שטוחה — פורטפוליו מגוון”.
-- אם מצב **Technical**: “הטבלה למטה מראה את אותם מספרים בצורה מדויקת”.
+**What to say**
+- “Horizontal bar chart of Top N products by revenue.” Change **Top N** to show interactivity.
+- “If a few SKUs dominate revenue — stock dependency; a flatter mix means a broader portfolio.”
+- In **Technical** mode: “The table below shows the exact figures.”
 """,
     "customers": """
-**מטרה:** ריכוזיות לקוחות וסיכון ריכוז.
+**Goal:** Customer concentration and risk.
 
-**מה להגיד**
-- “אותו סלייסר גלובלי — אז ההשוואה לטאב מוצרים עקבית”.
-- “לקוחות בראש הרשימה דורשים שימור; שים לב אם יש לקוח בודד עם נתח חריג”.
-- “מקשרים לטאב RFM לפעולות שיווק ממוקדות”.
+**What to say**
+- “Same global slicers — comparison with Products is apples-to-apples.”
+- “Top accounts deserve retention focus; call out a single customer with outsized share.”
+- “Link to the RFM tab for lifecycle actions.”
 """,
     "countries": """
-**מטרה:** גיאוגרפיה ונתח שוק.
+**Goal:** Geography and revenue share.
 
-**מה להגיד**
-- **Treemap** — “גודל המלבן ∝ הכנסה; צבע מחזק את ההבדל”.
-- “בדאטה הזה UK לרוב דומיננטי — אפשר לשאול מה הפוטנציאל בחו״ל”.
-- שנה **Top N** כדי להראות עומק גיאוגרפי.
+**What to say**
+- **Treemap** — “Tile size ∝ revenue; color reinforces differences.”
+- “In this classic dataset the UK is often dominant — discuss international upside.”
+- Adjust **Top N** to show geographic depth.
 """,
     "rfm": """
-**מטרה:** סגמנטציה לפי Recency / Frequency / Monetary — *על הנתונים המסוננים*.
+**Goal:** Recency / Frequency / Monetary segmentation — *on filtered data*.
 
-**מה להגיד**
-1. **הסליידרים** — “מצמצמים לקוחות רלוונטיים: לא ישנים מדי, לא חד־פעמיים מדי, לא זניחים כספית”.
-2. **גרף עמודות סגמנטים** — “איזה קודי RFM הכי מייצגים את הבייס”.
-3. **בועות** — “ציר X רצות ימים מאז רכישה אחרונה, Y תדירות, גודל בועה = כסף”.
-4. “הלוגיקה בקוד נשארת ב־`RetailAnalytics` / פונקציות עזר — ה־UI נשאר דק”.
+**What to say**
+1. **Sliders** — “Narrow to relevant customers: not too stale, not one-off, not negligible spend.”
+2. **Segment bar chart** — “Which RFM codes best represent the base.”
+3. **Bubble chart** — “X = recency (days), Y = frequency, bubble size = monetary.”
+4. “Logic stays in `RetailAnalytics` / helpers — the UI stays thin.”
 """,
     "arch": """
-**מטרה:** שקיפות הנדסית — מבנה תיקיות, SQL חיצוני, בדיקות.
+**Goal:** Engineering transparency — layout, external SQL, tests.
 
-**מה להגיד**
-- “מפרידים UI מלוגיקה: `app.py` מציג, `retail_etl` מבצע”.
-- “כל שאילתה דינמית עוברת allowlist; SQL בקבצים לתחזוקה”.
-- פתח expander אחד כדוגמה: “כך מאשרים שינוי בקוד בלי לחפש מחרוזות בפייתון”.
+**What to say**
+- “Separate UI from logic: `app.py` renders, `retail_etl` implements.”
+- “Dynamic queries use an allowlist; SQL lives in files for review.”
+- Open one expander as an example: “How we change SQL without hunting strings in Python.”
 """,
     "summary": """
-**מטרה:** סגירה מהירה — value proposition.
+**Goal:** Quick close — value proposition.
 
-**מה להגיד**
-- **Executive:** “מסלול אחד מנוהל מקובץ גולמי לדוחות שאפשר להגן עליהם בפגישת הנהלה”.
-- **Technical:** “Docker, pytest, מטא־דאטה, CLI — מוכן לסביבת קורס/POC ולהרחבה עתידית”.
+**What to say**
+- **Executive:** “One governed path from raw file to board-ready metrics.”
+- **Technical:** “Docker, pytest, metadata tables, CLI — course/PoC ready and extensible.”
 """,
     "staging": """
-**מטרה:** הוכחת grain וחוזה נתונים.
+**Goal:** Prove grain and data contracts.
 
-**מה להגיד**
-- “כל שורה = שורת חשבונית; `line_total` הוא פיצ’ר מחושב ב־ETL”.
-- “התצוגה מכבדת slicers — אותה לוגיקה כמו בגרפים”.
-- “אם שואלים על ניקוי — להפנות ל־`CleanConfig` ולסינון כמויות/מחירים”.
+**What to say**
+- “Each row is an invoice line; `line_total` is an engineered feature from ETL.”
+- “Preview respects slicers — same logic as the charts.”
+- “For cleaning rules, point to `CleanConfig` and quantity/price filters.”
 """,
 }
 
 
-def render_hebrew_presenter_hint(st, tab_key: str, *, enabled: bool) -> None:
-    """Expandable Hebrew script for live demos (see PRESENTER_HINTS_HE)."""
+def render_presenter_hint(st, tab_key: str, *, enabled: bool) -> None:
+    """Expandable English presenter script (see PRESENTER_HINTS)."""
     if not enabled:
         return
-    body = PRESENTER_HINTS_HE.get(tab_key)
+    body = PRESENTER_HINTS.get(tab_key)
     if not body:
         return
-    with st.expander("מה להגיד עכשיו · עברית (טקסט להצגה)", expanded=False):
+    with st.expander("Presenter hints — what to say (English)", expanded=False):
         st.markdown(body)
 
 

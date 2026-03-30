@@ -12,7 +12,7 @@ Online Retail–style CSV (default: `online_retail.csv` from `dp1224/online-reta
 
 ### Project structure
 
-- `data/raw/retail_sales.csv` – original Kaggle CSV (not tracked in git).
+- `data/raw/online_retail.csv` – original Kaggle CSV (not tracked in git).
 - `data/db/retail.db` – SQLite database with staging and mart tables.
 - `data/exports/` – CSV/JSON/Parquet/XLSX exports of mart tables.
 - `reports/charts/` – Plotly charts (HTML + PNG).
@@ -143,3 +143,13 @@ The marts and charts cover the required analysis steps:
   - Top countries by revenue.
 - **Storage** – SQLite marts and multi-format exports.
 - **Presentation** – Plotly charts and textual summaries printed by the CLI.
+
+### Requirement coverage checklist
+
+- [x] End-to-end ETL pipeline (extract, clean, transform, load, present).
+- [x] Pandas-based observation, cleaning, manipulation, and aggregation.
+- [x] Storage in SQLite and exports to CSV/JSON/Parquet/XLSX.
+- [x] CLI via `argparse` with multiple commands (`run-all`, `ingest`, `monitor`, `watch`, `export`, `plot`).
+- [x] Dynamic analysis in Streamlit with advanced slicers (date range, countries, min line-total, product search).
+- [x] Real-life dataset ingestion from Kaggle API.
+- [ ] Mentor discussion / presentation step (outside codebase; complete in class review).

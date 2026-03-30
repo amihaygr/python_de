@@ -13,7 +13,6 @@ import sqlite3
 import streamlit as st
 
 from retail_etl.analytics import RetailAnalytics
-from retail_etl.db_security import assert_read_table
 from retail_etl.local_time import format_utc_iso_as_israel, localize_alert_rows
 from retail_etl.meta import clear_alerts, connect as meta_connect, get_last_success, get_source_state, list_active_alerts
 from retail_etl.monitor import check_for_update
@@ -59,13 +58,6 @@ def get_connection(db_path: Path) -> sqlite3.Connection:
 
 
 @st.cache_data(ttl=60)
-def load_table(db_path: Path, table: str) -> pd.DataFrame:
-    safe = assert_read_table(table)
-    with get_connection(db_path) as conn:
-        return pd.read_sql_query(f"SELECT * FROM {safe}", conn)
-
-
-@st.cache_data(ttl=60)
 def load_dataset_overview(db_path: Path) -> dict:
     with get_connection(db_path) as conn:
         row = conn.execute(
@@ -86,6 +78,27 @@ def load_dataset_overview(db_path: Path) -> dict:
         "min_date": row[3],
         "max_date": row[4],
     }
+
+
+@st.cache_data(ttl=60)
+def load_staging_for_slicers(db_path: Path) -> pd.DataFrame:
+    with get_connection(db_path) as conn:
+        df = pd.read_sql_query(
+            """
+            SELECT
+                InvoiceNo, StockCode, Description, Quantity, InvoiceDate,
+                UnitPrice, CustomerID, Country, line_total
+            FROM stg_sales_clean
+            """,
+            conn,
+        )
+    df["InvoiceDate"] = pd.to_datetime(df["InvoiceDate"], errors="coerce")
+    df["line_total"] = pd.to_numeric(df["line_total"], errors="coerce").fillna(0.0)
+    df["Quantity"] = pd.to_numeric(df["Quantity"], errors="coerce").fillna(0.0)
+    df["CustomerID"] = pd.to_numeric(df["CustomerID"], errors="coerce")
+    df["Country"] = df["Country"].fillna("").astype(str).str.strip()
+    df["Description"] = df["Description"].fillna("").astype(str).str.strip()
+    return df[df["InvoiceDate"].notna()].copy()
 
 
 def main() -> None:
@@ -153,29 +166,115 @@ def main() -> None:
         ),
     )
 
-    with st.spinner("Loading mart tables…"):
+    with st.spinner("Loading staging table…"):
         try:
-            monthly = load_table(db_path, "mart_sales_monthly")
-            products = load_table(db_path, "mart_product_summary")
-            customers = load_table(db_path, "mart_customer_summary")
-            countries = load_table(db_path, "mart_country_summary")
+            staging_df = load_staging_for_slicers(db_path)
         except Exception as e:  # noqa: BLE001
-            st.error(f"Failed to load mart tables: {e}")
+            st.error(f"Failed to load staging table for slicers: {e}")
             return
+    if staging_df.empty:
+        st.error("Staging table is empty; run refresh first.")
+        return
+
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("Advanced slicers")
+    min_dt = staging_df["InvoiceDate"].min().date()
+    max_dt = staging_df["InvoiceDate"].max().date()
+    date_range = st.sidebar.date_input(
+        "Invoice date range",
+        value=(min_dt, max_dt),
+        min_value=min_dt,
+        max_value=max_dt,
+    )
+    if isinstance(date_range, tuple) and len(date_range) == 2:
+        from_date, to_date = date_range
+    else:
+        from_date, to_date = min_dt, max_dt
+
+    country_options = sorted([c for c in staging_df["Country"].dropna().unique().tolist() if c])
+    selected_countries = st.sidebar.multiselect(
+        "Countries",
+        options=country_options,
+        default=country_options,
+    )
+    max_line_total = float(staging_df["line_total"].quantile(0.99)) if not staging_df.empty else 0.0
+    min_line_total = st.sidebar.slider(
+        "Minimum line total",
+        min_value=0.0,
+        max_value=max(max_line_total, 1.0),
+        value=0.0,
+        step=1.0,
+    )
+    product_search = st.sidebar.text_input("Product contains", value="").strip().lower()
+
+    filtered_df = staging_df[
+        (staging_df["InvoiceDate"].dt.date >= from_date)
+        & (staging_df["InvoiceDate"].dt.date <= to_date)
+        & (staging_df["line_total"] >= min_line_total)
+    ].copy()
+    if selected_countries:
+        filtered_df = filtered_df[filtered_df["Country"].isin(selected_countries)]
+    else:
+        filtered_df = filtered_df.iloc[0:0]
+    if product_search:
+        filtered_df = filtered_df[filtered_df["Description"].str.lower().str.contains(product_search, na=False)]
+
+    if filtered_df.empty:
+        st.warning("No rows match the current slicers. Widen the filters in the sidebar.")
+        return
+
+    filtered_df["year_month"] = filtered_df["InvoiceDate"].dt.to_period("M").astype(str)
+    filtered_df["weekday"] = filtered_df["InvoiceDate"].dt.day_name().str.slice(0, 3)
+    invoice_totals = (
+        filtered_df.groupby("InvoiceNo", as_index=False)["line_total"]
+        .sum()
+        .rename(columns={"line_total": "invoice_revenue"})
+    )
+    monthly_filtered = (
+        filtered_df.groupby("year_month", as_index=False)
+        .agg(revenue=("line_total", "sum"), units=("Quantity", "sum"), invoices=("InvoiceNo", "nunique"))
+        .sort_values("year_month")
+    )
+    weekday_order = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    weekday_filtered = (
+        filtered_df.groupby("weekday", as_index=False)
+        .agg(revenue=("line_total", "sum"))
+        .assign(weekday_num=lambda d: d["weekday"].map({w: i for i, w in enumerate(weekday_order)}))
+        .sort_values("weekday_num")
+    )
+    products_filtered = (
+        filtered_df.groupby("Description", as_index=False)
+        .agg(revenue=("line_total", "sum"), units=("Quantity", "sum"), invoices=("InvoiceNo", "nunique"))
+        .sort_values("revenue", ascending=False)
+    )
+    customers_filtered = (
+        filtered_df.groupby("CustomerID", as_index=False)
+        .agg(revenue=("line_total", "sum"), units=("Quantity", "sum"), invoices=("InvoiceNo", "nunique"))
+        .sort_values("revenue", ascending=False)
+    )
+    countries_filtered = (
+        filtered_df.groupby("Country", as_index=False)
+        .agg(revenue=("line_total", "sum"), units=("Quantity", "sum"), invoices=("InvoiceNo", "nunique"))
+        .sort_values("revenue", ascending=False)
+    )
+    filtered_kpis = {
+        "revenue": float(filtered_df["line_total"].sum()),
+        "units": float(filtered_df["Quantity"].sum()),
+        "invoices": float(filtered_df["InvoiceNo"].nunique()),
+        "customers": float(filtered_df["CustomerID"].nunique()),
+        "products": float(filtered_df["StockCode"].nunique()),
+        "avg_invoice_value": float(invoice_totals["invoice_revenue"].mean() if not invoice_totals.empty else 0.0),
+        "avg_lines_per_invoice": float(len(filtered_df) / max(filtered_df["InvoiceNo"].nunique(), 1)),
+        "avg_spend_per_customer": float(
+            filtered_df["line_total"].sum() / max(filtered_df["CustomerID"].nunique(), 1)
+        ),
+        "uk_revenue_share": float(
+            filtered_df.loc[filtered_df["Country"].eq("United Kingdom"), "line_total"].sum()
+            / max(filtered_df["line_total"].sum(), 1.0)
+        ),
+    }
 
     analytics = RetailAnalytics(db_path)
-
-    @st.cache_data(ttl=60)
-    def get_kpis() -> dict[str, float | str]:
-        return analytics.get_kpis()
-
-    @st.cache_data(ttl=3600)
-    def get_weekday_revenue() -> pd.DataFrame:
-        return analytics.get_revenue_by_weekday()
-
-    @st.cache_data(ttl=3600)
-    def get_invoice_distribution() -> pd.DataFrame:
-        return analytics.get_invoice_revenue_distribution()
 
     @st.cache_data(ttl=3600)
     def get_rfm_df() -> pd.DataFrame:
@@ -237,6 +336,11 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
         c2.metric("Distinct customers", f"{info['customers']:,}")
         c3.metric("Countries", f"{info['countries']:,}")
         c4.metric("Date range", f"{info['min_date']} → {info['max_date']}")
+        st.caption(
+            f"Slicer result: **{len(filtered_df):,}** rows · "
+            f"{filtered_df['InvoiceNo'].nunique():,} invoices · "
+            f"{filtered_df['CustomerID'].nunique():,} customers."
+        )
 
         st.subheader("Operational status")
         with meta_connect(db_path) as conn:
@@ -311,10 +415,9 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
         render_architecture_presentation(st, root, executive_mode=executive)
 
     with tab_overview:
-        kpis = get_kpis()
-        total_revenue = float(monthly["revenue"].sum())
-        total_units = float(monthly["units"].sum())
-        total_invoices = float(monthly["invoices"].sum())
+        total_revenue = float(filtered_kpis["revenue"])
+        total_units = float(filtered_kpis["units"])
+        total_invoices = float(filtered_kpis["invoices"])
 
         st.subheader("Headline metrics")
         col1, col2, col3 = st.columns(3)
@@ -323,17 +426,17 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
         col3.metric("Invoices", f"{total_invoices:,.0f}")
 
         col4, col5, col6 = st.columns(3)
-        col4.metric("Avg invoice value", f"{kpis['avg_invoice_value']:,.2f}")
-        col5.metric("Avg lines / invoice", f"{kpis['avg_lines_per_invoice']:,.2f}")
-        col6.metric("Avg revenue / customer", f"{kpis['avg_spend_per_customer']:,.2f}")
+        col4.metric("Avg invoice value", f"{filtered_kpis['avg_invoice_value']:,.2f}")
+        col5.metric("Avg lines / invoice", f"{filtered_kpis['avg_lines_per_invoice']:,.2f}")
+        col6.metric("Avg revenue / customer", f"{filtered_kpis['avg_spend_per_customer']:,.2f}")
 
         col7, col8, _ = st.columns(3)
-        col7.metric("UK revenue share", f"{kpis['uk_revenue_share']*100:.1f}%")
-        col8.metric("Distinct SKUs", f"{int(kpis['products']):,}")
+        col7.metric("UK revenue share", f"{filtered_kpis['uk_revenue_share']*100:.1f}%")
+        col8.metric("Distinct SKUs", f"{int(filtered_kpis['products']):,}")
 
         st.subheader("Monthly revenue")
         fig = px.line(
-            monthly,
+            monthly_filtered,
             x="year_month",
             y="revenue",
             title="Revenue by month",
@@ -347,9 +450,8 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
             st.caption("Seasonality note: align stock and marketing with peaks; investigate structural breaks after refreshes.")
 
         st.subheader("Revenue by weekday")
-        weekday = get_weekday_revenue()
         weekday_fig = px.bar(
-            weekday,
+            weekday_filtered,
             x="weekday",
             y="revenue",
             title="Revenue by weekday",
@@ -357,14 +459,13 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
         )
         weekday_fig.update_layout(template="plotly_white", height=420)
         st.plotly_chart(weekday_fig, use_container_width=True)
-        if not weekday.empty:
-            best = weekday.sort_values("revenue", ascending=False).iloc[0]
+        if not weekday_filtered.empty:
+            best = weekday_filtered.sort_values("revenue", ascending=False).iloc[0]
             st.caption(f"Top weekday: **{best['weekday']}** → {best['revenue']:,.0f} revenue.")
 
         st.subheader("Invoice size distribution")
-        inv = get_invoice_distribution()
         hist_fig = px.histogram(
-            inv,
+            invoice_totals,
             x="invoice_revenue",
             nbins=40,
             title="Revenue per invoice",
@@ -372,16 +473,16 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
         )
         hist_fig.update_layout(template="plotly_white", height=420)
         st.plotly_chart(hist_fig, use_container_width=True)
-        if not inv.empty:
-            q50 = float(inv["invoice_revenue"].quantile(0.5))
-            q90 = float(inv["invoice_revenue"].quantile(0.9))
-            q95 = float(inv["invoice_revenue"].quantile(0.95))
+        if not invoice_totals.empty:
+            q50 = float(invoice_totals["invoice_revenue"].quantile(0.5))
+            q90 = float(invoice_totals["invoice_revenue"].quantile(0.9))
+            q95 = float(invoice_totals["invoice_revenue"].quantile(0.95))
             st.caption(f"Median **{q50:,.2f}** · P90 **{q90:,.2f}** · P95 **{q95:,.2f}**")
 
     with tab_products:
         st.subheader("Top products by revenue")
         top_n = st.slider("Top N", min_value=5, max_value=30, value=10, step=5, key="p")
-        top_products = products.head(top_n)
+        top_products = products_filtered.head(top_n)
         fig = px.bar(
             top_products,
             x="Description",
@@ -401,7 +502,7 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
     with tab_customers:
         st.subheader("Top customers by revenue")
         top_n_c = st.slider("Top N", min_value=5, max_value=30, value=10, step=5, key="c")
-        top_customers = customers.head(top_n_c)
+        top_customers = customers_filtered.head(top_n_c)
         fig = px.bar(
             top_customers,
             x="CustomerID",
@@ -421,7 +522,7 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
     with tab_countries:
         st.subheader("Top countries by revenue")
         top_n_co = st.slider("Top N", min_value=5, max_value=30, value=10, step=5, key="co")
-        top_countries = countries.head(top_n_co)
+        top_countries = countries_filtered.head(top_n_co)
         fig = px.bar(
             top_countries,
             x="Country",
@@ -545,6 +646,7 @@ For engineering depth, switch sidebar mode to **Technical** or open the **Archit
     with tab_table:
         st.subheader("Central staging table: `stg_sales_clean`")
         st.caption("Built after transform; all marts are derived from this table.")
+        st.caption("Preview below respects sidebar slicers.")
 
         st.markdown(
             """
@@ -568,6 +670,23 @@ For engineering depth, switch sidebar mode to **Technical** or open the **Archit
 Parse dates; coerce numerics; optional drop missing `CustomerID`; filter `Quantity >= 1` and `UnitPrice > 0`
 (returns / invalid lines excluded per project defaults).
 """
+        )
+        st.dataframe(
+            filtered_df[
+                [
+                    "InvoiceNo",
+                    "StockCode",
+                    "Description",
+                    "Quantity",
+                    "InvoiceDate",
+                    "UnitPrice",
+                    "CustomerID",
+                    "Country",
+                    "line_total",
+                ]
+            ].head(500),
+            use_container_width=True,
+            hide_index=True,
         )
 
 

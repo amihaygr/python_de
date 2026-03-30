@@ -35,6 +35,29 @@ def weekday_hour_revenue_pivot(df: pd.DataFrame) -> pd.DataFrame:
     return pivot
 
 
+def normalize_weekday_hour_pivot_rows(pivot: pd.DataFrame) -> pd.DataFrame:
+    """Each row is % of that weekday's total revenue (sums to 100 where row total > 0)."""
+    if pivot.empty:
+        return pivot
+    sums = pivot.sum(axis=1)
+    out = pivot.div(sums.replace(0, float("nan")), axis=0) * 100.0
+    return out.fillna(0.0)
+
+
+def weekday_hour_pivot_slice_hours(pivot: pd.DataFrame, hour_start: int, hour_end: int) -> pd.DataFrame:
+    """Keep hour columns in [hour_start, hour_end] inclusive (clamped to 0–23)."""
+    if pivot.empty:
+        return pivot
+    lo = max(0, min(23, int(hour_start)))
+    hi = max(0, min(23, int(hour_end)))
+    if lo > hi:
+        lo, hi = hi, lo
+    cols = [c for c in pivot.columns if lo <= int(c) <= hi]
+    if not cols:
+        return pivot.iloc[:, 0:0].copy()
+    return pivot[cols].copy()
+
+
 def _connect(db_path: Path) -> sqlite3.Connection:
     return sqlite3.connect(db_path, timeout=30.0)
 

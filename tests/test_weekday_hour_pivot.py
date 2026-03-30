@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
-from retail_etl.analytics import weekday_hour_revenue_pivot
+from retail_etl.analytics import (
+    normalize_weekday_hour_pivot_rows,
+    weekday_hour_pivot_slice_hours,
+    weekday_hour_revenue_pivot,
+)
 
 
 def test_weekday_hour_revenue_pivot_empty() -> None:
@@ -29,3 +34,28 @@ def test_weekday_hour_revenue_pivot_orders_weekdays_and_hours() -> None:
     assert pivot.loc["Tue", 10] == 25.0
     assert 0 in pivot.columns and 23 in pivot.columns
     assert pivot.shape[1] == 24
+
+
+def test_normalize_weekday_hour_pivot_rows_sums_to_100() -> None:
+    df = pd.DataFrame(
+        {
+            "InvoiceDate": pd.to_datetime(["2024-01-01 10:00:00", "2024-01-01 11:00:00"]),
+            "line_total": [100.0, 50.0],
+        }
+    )
+    pivot = weekday_hour_revenue_pivot(df)
+    norm = normalize_weekday_hour_pivot_rows(pivot)
+    assert list(norm.index) == ["Mon"]
+    assert norm.loc["Mon"].sum() == pytest.approx(100.0)
+
+
+def test_weekday_hour_pivot_slice_hours() -> None:
+    df = pd.DataFrame(
+        {
+            "InvoiceDate": pd.to_datetime(["2024-01-01 10:00:00", "2024-01-01 11:00:00"]),
+            "line_total": [1.0, 2.0],
+        }
+    )
+    pivot = weekday_hour_revenue_pivot(df)
+    sliced = weekday_hour_pivot_slice_hours(pivot, 10, 11)
+    assert list(sliced.columns) == [10, 11]

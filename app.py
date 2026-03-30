@@ -13,7 +13,12 @@ import plotly.graph_objects as go
 import sqlite3
 import streamlit as st
 
-from retail_etl.analytics import RetailAnalytics, weekday_hour_revenue_pivot
+from retail_etl.analytics import (
+    RetailAnalytics,
+    normalize_weekday_hour_pivot_rows,
+    weekday_hour_pivot_slice_hours,
+    weekday_hour_revenue_pivot,
+)
 from retail_etl.local_time import format_utc_iso_as_israel, localize_alert_rows
 from retail_etl.meta import clear_alerts, connect as meta_connect, get_last_success, get_source_state, list_active_alerts
 from retail_etl.monitor import check_for_update
@@ -509,34 +514,83 @@ Each **row** is an invoice line (SKU × quantity × unit price). Grain supports 
 
         st.subheader("Shopping rhythm: weekday × hour")
         st.caption(
-            "Heatmap of **revenue** by calendar weekday and clock hour from `InvoiceDate` "
-            "(same slicers as above). Brighter cells = more sales in that hour."
+            "Heatmap from `InvoiceDate`: **absolute revenue** or **% of that weekday** (shape of the day). "
+            "Optional **business-hours** slice focuses the x-axis. Same global slicers apply."
         )
+        hcol1, hcol2 = st.columns(2)
+        with hcol1:
+            hm_view = st.radio(
+                "Heatmap metric",
+                options=["Absolute revenue", "Share of weekday (%)"],
+                horizontal=True,
+                key="heatmap_metric",
+                help="Percent mode normalizes each weekday row to 100% so you can compare intra-day shape.",
+            )
+        with hcol2:
+            hm_business = st.checkbox(
+                "Business hours only",
+                value=False,
+                key="heatmap_business_hours",
+                help="Restrict the chart to a start/end hour (inclusive).",
+            )
+        hour_lo, hour_hi = 8, 18
+        if hm_business:
+            bh1, bh2 = st.columns(2)
+            with bh1:
+                hour_lo = st.slider("From hour", 0, 23, 8, key="heatmap_hour_from")
+            with bh2:
+                hour_hi = st.slider("To hour", 0, 23, 18, key="heatmap_hour_to")
+
         wh_pivot = weekday_hour_revenue_pivot(filtered_df)
         if wh_pivot.empty:
             st.warning("Not enough timed invoice rows for a weekday×hour heatmap.")
         else:
-            hm_fig = go.Figure(
-                data=go.Heatmap(
-                    z=wh_pivot.values,
-                    x=[f"{int(h):02d}:00" for h in wh_pivot.columns],
-                    y=list(wh_pivot.index),
-                    colorscale="YlOrRd",
-                    hovertemplate="%{y} · %{x}<br>Revenue %{z:,.0f}<extra></extra>",
-                    colorbar=dict(title="Revenue"),
+            display_pivot = wh_pivot
+            if hm_business:
+                display_pivot = weekday_hour_pivot_slice_hours(display_pivot, hour_lo, hour_hi)
+            if display_pivot.empty or display_pivot.shape[1] == 0:
+                st.warning("No hours in the selected window; widen the range.")
+            else:
+                hover_tmpl = "%{y} · %{x}<br>Revenue %{z:,.0f}<extra></extra>"
+                cbar_title = "Revenue"
+                title_suffix = ""
+                if hm_view == "Share of weekday (%)":
+                    # Normalize on full 0–23 row; optional hour slice shows same % of whole weekday
+                    z_df = normalize_weekday_hour_pivot_rows(wh_pivot)
+                    if hm_business:
+                        z_df = weekday_hour_pivot_slice_hours(z_df, hour_lo, hour_hi)
+                    z_matrix = z_df.values
+                    x_labels = [f"{int(h):02d}:00" for h in z_df.columns]
+                    y_labels = list(z_df.index)
+                    hover_tmpl = "%{y} · %{x}<br>%{z:.1f}% of weekday<extra></extra>"
+                    cbar_title = "% of weekday"
+                    title_suffix = " — % of weekday"
+                else:
+                    z_matrix = display_pivot.values
+                    x_labels = [f"{int(h):02d}:00" for h in display_pivot.columns]
+                    y_labels = list(display_pivot.index)
+                hm_fig = go.Figure(
+                    data=go.Heatmap(
+                        z=z_matrix,
+                        x=x_labels,
+                        y=y_labels,
+                        colorscale="YlOrRd",
+                        hovertemplate=hover_tmpl,
+                        colorbar=dict(title=cbar_title),
+                    )
                 )
-            )
-            hm_fig.update_layout(
-                xaxis=dict(title="Hour of day", tickangle=-45),
-                yaxis=dict(title="Weekday", autorange="reversed"),
-                hovermode="closest",
-            )
-            _style_fig(hm_fig, height=440)
-            st.plotly_chart(hm_fig, width="stretch")
+                hm_fig.update_layout(
+                    title=f"Shopping rhythm{title_suffix}",
+                    xaxis=dict(title="Hour of day", tickangle=-45),
+                    yaxis=dict(title="Weekday", autorange="reversed"),
+                    hovermode="closest",
+                )
+                _style_fig(hm_fig, height=440)
+                st.plotly_chart(hm_fig, width="stretch")
             if executive:
                 st.info(
-                    "**Pulse:** this shows *when* demand clusters across the week—useful for staffing, "
-                    "send-time, and campaign windows."
+                    "**Pulse:** brighter = more demand in that slot—use **%** mode to compare *shape* across "
+                    "weekdays even when totals differ."
                 )
             else:
                 st.caption(
@@ -747,6 +801,8 @@ The UI stays thin; quantitative logic lives in **`src/retail_etl/analytics.py`**
 | `get_invoice_revenue_distribution()` | Invoice-level histogram input |
 | `get_rfm(q=5)` | Segmentation with quantile bins |
 | `weekday_hour_revenue_pivot(df)` | Weekday × hour revenue matrix (heatmap input) |
+| `normalize_weekday_hour_pivot_rows(pivot)` | Row-wise % of weekday (for shape comparison) |
+| `weekday_hour_pivot_slice_hours(pivot, lo, hi)` | Hour column slice (business window) |
 """
             )
             st.divider()
